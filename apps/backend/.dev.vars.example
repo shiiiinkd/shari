@@ -1,0 +1,17 @@
+# apps/backend/.dev.vars （ローカル開発用）のテンプレート。
+# 実ファイル .dev.vars は .gitignore 済み。値を入れて .dev.vars にコピーすること。
+# 本番（Cloudflare Workers）には `wrangler secret put <KEY>` で投入する。
+# 新規シークレットを足すときの完全な手順は /setup-secret skill を参照。
+
+# --- Anthropic Claude API ---
+ANTHROPIC_API_KEY=
+
+# --- Supabase ---
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+# サーバ専用。mobile / クライアントに絶対渡さない。
+SUPABASE_SERVICE_ROLE_KEY=
+
+# --- 外部API（任意） ---
+# Qiita: 未設定でも動くがレート制限が厳しい
+QIITA_TOKEN=
