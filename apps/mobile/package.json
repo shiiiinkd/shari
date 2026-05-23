@@ -1,0 +1,31 @@
+{
+  "name": "@shari/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "dev": "expo start",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf node_modules .turbo .expo"
+  },
+  "dependencies": {
+    "@shari/api": "workspace:*",
+    "@tanstack/react-query": "^5.62.11",
+    "@trpc/client": "^11.0.0-rc.660",
+    "@trpc/react-query": "^11.0.0-rc.660",
+    "@trpc/server": "^11.0.0-rc.660",
+    "expo": "~56.0.3",
+    "expo-status-bar": "~56.0.4",
+    "react": "19.2.3",
+    "react-native": "0.85.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~5.7.3"
+  }
+}

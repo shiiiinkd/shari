@@ -1,0 +1,19 @@
+name = "shari-backend"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# 東京リージョンに固定（要件: エッジ・東京リージョン）
+# Workersは自動でリクエスト元に近いエッジで実行されるため、
+# 通常はリージョン指定不要。Smart Placement で外部API呼び出し最適化を行う。
+[placement]
+mode = "smart"
+
+# --- 環境変数の例（本番は wrangler secret put で投入） ---
+# [vars]
+# ENVIRONMENT = "development"
+
+# --- Supabase などの secrets は wrangler secret put で設定 ---
+# wrangler secret put ANTHROPIC_API_KEY
+# wrangler secret put SUPABASE_URL
+# wrangler secret put SUPABASE_ANON_KEY

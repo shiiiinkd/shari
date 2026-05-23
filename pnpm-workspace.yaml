@@ -1,0 +1,24 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+  sharp: true
+  workerd: true
+
+# モノレポ内で複数バージョンが混在しないように固定
+# （Expo + react-native は単一バージョンが必須）
+overrides:
+  react: 19.2.3
+  react-native: 0.85.3
+
+# build scripts の許可リスト
+# - workerd: Cloudflare Workers のローカルランタイム（wrangler dev に必須）
+# - esbuild: バンドラ。Workers/Expo 共に多用される
+# - sharp: 画像処理ネイティブモジュール（Expo / Metro 経由で要求される）
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - workerd
