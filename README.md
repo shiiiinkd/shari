@@ -51,7 +51,7 @@ shari/
 
 ### 前提
 
-- Node.js 20以上
+- Node.js 22.13以上
 - pnpm（`corepack enable` で有効化可）
 - Xcode（iOS実機/シミュレータ実行時）/ Android Studio（Android時）
 - Cloudflare アカウント（デプロイ時）
@@ -85,14 +85,17 @@ pnpm build
 
 ## 環境変数
 
-`.env.example` を `.env` にコピーして値を設定。
+backend は `apps/backend/.dev.vars.example` を `.dev.vars` に、mobile は `apps/mobile/.env.example` を `.env` にコピーして値を設定。詳細・配置先は [docs/architecture.md](./docs/architecture.md#6-環境変数) を参照。
 
-| キー                | 用途                                |
-| ------------------- | ----------------------------------- |
-| `ANTHROPIC_API_KEY` | Claude API                          |
-| `SUPABASE_URL`      | Supabase エンドポイント             |
-| `SUPABASE_ANON_KEY` | Supabase クライアント鍵             |
-| `QIITA_TOKEN`       | Qiita API（任意・レート制限緩和用） |
+| キー                        | 用途                                | 配置先                                       |
+| --------------------------- | ----------------------------------- | -------------------------------------------- |
+| `ANTHROPIC_API_KEY`         | Claude API                          | Workers Secret / `.dev.vars`                 |
+| `SUPABASE_URL`              | Supabase エンドポイント             | Workers Secret + Expo `EXPO_PUBLIC_*`        |
+| `SUPABASE_ANON_KEY`         | Supabase クライアント鍵             | Workers Secret + Expo `EXPO_PUBLIC_*`        |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase サーバ専用鍵               | **Workers Secret のみ**（mobile に渡さない） |
+| `QIITA_TOKEN`               | Qiita API（任意・レート制限緩和用） | Workers Secret                               |
+| `ALLOWED_ORIGIN`            | CORS 許可オリジン（カンマ区切り）   | Workers Secret / `.dev.vars`                 |
+| `EXPO_PUBLIC_TRPC_URL`      | mobile から見た backend の tRPC URL | mobile `.env`                                |
 
 ---
 

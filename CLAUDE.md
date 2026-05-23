@@ -34,7 +34,8 @@ shari/
 pnpm dev                              # 開発サーバ起動（Turborepo）
 pnpm build                            # 全パッケージビルド
 pnpm typecheck                        # 型チェック（tsc --noEmit）
-pnpm lint                             # lint（現状は tsc --noEmit を流用）
+pnpm lint                             # ESLint
+pnpm format                           # Prettier 整形（--check は format:check）
 
 # 個別
 pnpm --filter @shari/backend dev      # wrangler dev（:8787）
