@@ -111,7 +111,7 @@ shari/
 
 ### 重要な制約
 
-- **Cloudflare Workers CPU 上限**: 無料枠 50ms / 有料 30s。Claude API レスポンス待ちはサブリクエストとして扱われ CPU 時間には乗らないので長時間呼び出しはOK
+- **Cloudflare Workers CPU 上限**: Free 10ms / Paid Standard 30s。Claude API レスポンス待ちはサブリクエストとして扱われ CPU 時間には乗らないので長時間呼び出しはOK
 - **Workers サブリクエスト数上限**: 1 リクエスト 50 件。Qiita / Zenn を扇形展開しすぎないこと
 - **Claude API コスト**: 約 ¥10〜15 / 動画。**Supabase によるキャッシュは MVP から必須**（無いとサブスク経済性が崩れる）
 
@@ -184,9 +184,52 @@ shari/
 
 ---
 
-## 9. 関連ドキュメント
+## 9. レイヤ境界と不変ルール
+
+各パッケージ・アプリの責務と「やってはいけないこと」を明文化する。
+CLAUDE.md のレイヤ境界セクションからここを参照しているので、変更時は両方に注意。
+
+### packages/shared
+
+- mobile / backend / 将来の web から共通で参照される
+- **ランタイム非依存コードのみ**配置（Node.js API、React Native API、Workers API への直接依存禁止）
+- 中身: Zod schema、純粋関数、型定義、ドメインロジック
+- 例: YouTube URL → videoId 抽出、字幕テキストの整形
+
+### packages/api
+
+- tRPC router の型定義。mobile への公開IF
+- **破壊的変更（procedure 削除・input/output 型変更）は必ず mobile 側の影響を確認**
+- 内容: router 構造と Zod schema による input/output。実装本体は backend で書く
+- 副作用（DB・外部API呼び出し）は backend 側に持たせ、ここでは型シェアに徹する
+
+### apps/backend (Cloudflare Workers)
+
+Workers ランタイム制約あり:
+
+- **Node.js 専用 API 不可**: `fs`, `child_process`, `net`, `Buffer` の一部
+- **CPU 時間**: Free 10ms / Paid Standard 30s。重い同期処理は分割するか Unbound プランへ
+- **サブリクエスト**: 1 リクエスト最大 50。`Promise.all` で扇形展開しすぎない（Qiita / Zenn 等）
+- **isolate 越しの状態共有 NG**: isolate がリクエスト間で使い回されるため、グローバル変数にユーザー固有データを置かない（漏洩リスク）
+
+DB アクセスは:
+
+- Supabase クライアント経由のみ。**生 SQL 直書き禁止**（型安全と RLS 整合性のため）
+- `service_role` キーは backend のみ。mobile に絶対渡さない
+
+### apps/mobile (Expo)
+
+- Expo 56 固定。バージョン差異が大きいので新規コード前に必ず公式 v56 ドキュメント参照
+- `EXPO_PUBLIC_*` 環境変数は **バンドルに焼き込まれて公開される**。シークレットを入れない
+- tRPC 型は `import type { AppRouter } from "@shari/api"` 経由。**相対パス import 禁止**
+- ネイティブモジュール追加時は Expo Managed Workflow の範囲内か事前確認（範囲外なら Bare 移行が必要になる）
+
+---
+
+## 10. 関連ドキュメント
 
 - ルート規約: [../CLAUDE.md](../CLAUDE.md)
+- データモデル: [./data-model.md](./data-model.md)
 - コミット規約: [../.claude/skills/commit/SKILL.md](../.claude/skills/commit/SKILL.md)
 - レビュー観点: [../.claude/skills/code-review/SKILL.md](../.claude/skills/code-review/SKILL.md)
 - Expo v56 公式: https://docs.expo.dev/versions/v56.0.0/
