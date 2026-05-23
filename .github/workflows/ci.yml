@@ -36,3 +36,8 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Build
+        # @shari/backend は wrangler deploy --dry-run でバンドル検証も兼ねる。
+        # mobile の expo build は EAS 依存で CI 対象外。
+        run: pnpm --filter @shari/backend build
