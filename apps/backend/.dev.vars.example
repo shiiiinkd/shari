@@ -15,3 +15,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 # --- 外部API（任意） ---
 # Qiita: 未設定でも動くがレート制限が厳しい
 QIITA_TOKEN=
+
+# --- CORS ---
+# カンマ区切りで複数指定可。dev は `*`、本番は https://shari.app 等に絞る。
+ALLOWED_ORIGIN=*
