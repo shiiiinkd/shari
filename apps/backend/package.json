@@ -13,7 +13,7 @@
   "dependencies": {
     "@hono/trpc-server": "^0.3.4",
     "@shari/api": "workspace:*",
-    "@trpc/server": "^11.0.0-rc.660",
+    "@trpc/server": "11.17.0",
     "hono": "^4.6.16",
     "zod": "^3.24.1"
   },
