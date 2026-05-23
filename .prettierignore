@@ -13,3 +13,5 @@ android
 ios
 apps/backend/.wrangler
 apps/mobile/.expo
+# Expo が expo start 起動時に書き換えるため Prettier の管轄外にする
+apps/mobile/tsconfig.json
