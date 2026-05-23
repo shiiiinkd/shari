@@ -15,6 +15,9 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
+  runtimeVersion: {
+    policy: "sdkVersion",
+  },
   ios: {
     supportsTablet: true,
   },

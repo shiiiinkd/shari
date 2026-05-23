@@ -1,0 +1,59 @@
+name: Deploy Cloudflare Workers
+
+# main にマージされたら apps/backend を Cloudflare Workers に自動デプロイ。
+# apps/backend/ もしくは packages/ の変更があったときだけ走る。
+#
+# 必須セットアップ（未登録だと deploy ステップで fail する）:
+#   1. https://dash.cloudflare.com/profile/api-tokens で
+#      "Edit Cloudflare Workers" テンプレで API Token 発行
+#   2. Workers ダッシュボード右サイドの Account ID をコピー
+#   3. GitHub Secrets に以下を登録:
+#        - CLOUDFLARE_API_TOKEN
+#        - CLOUDFLARE_ACCOUNT_ID
+#   4. Workers の実行時 secret (ANTHROPIC_API_KEY など) は別途
+#      `wrangler secret put` で投入済みであること
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-cf.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cf-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: wrangler deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck backend
+        run: pnpm --filter @shari/backend typecheck
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/backend
+          packageManager: pnpm

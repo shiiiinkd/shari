@@ -1,0 +1,65 @@
+name: EAS Build (Production)
+
+# 本番ビルドはクレジット消費が大きいので手動トリガーのみ。
+# Actions タブ → "EAS Build (Production)" → "Run workflow" から実行。
+#
+# 有効化手順:
+#   1. preview.yml と同じく EXPO_TOKEN を Secrets に登録
+#   2. `apps/mobile/eas.json` に production / preview プロファイルが定義済みであること
+#   3. GitHub Variables に EAS_BUILD_ENABLED=true を登録
+#   4. 初回ビルド時のみ `eas credentials` でクレデンシャル登録が必要
+#      （iOS: Apple Developer 契約 / Android: Google Play 開発者アカウント）
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "ビルド対象プラットフォーム"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - ios
+          - android
+      profile:
+        description: "eas.json のビルドプロファイル"
+        required: true
+        type: choice
+        default: production
+        options:
+          - production
+          - preview
+
+concurrency:
+  group: eas-build-${{ github.event.inputs.platform }}-${{ github.event.inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: eas build (${{ github.event.inputs.platform }} / ${{ github.event.inputs.profile }})
+    if: vars.EAS_BUILD_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run EAS Build
+        working-directory: apps/mobile
+        run: eas build --platform ${{ github.event.inputs.platform }} --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait

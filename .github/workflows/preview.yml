@@ -1,0 +1,59 @@
+name: EAS Update (Preview)
+
+# PR にコミットが入るたびに EAS Update でプレビュー版を配信し、
+# expo/expo-github-action が PR にコメント（QR コード／リンク）を投稿する。
+#
+# 有効化手順:
+#   1. `pnpm dlx eas-cli@latest login` で Expo アカウントにログイン
+#   2. `cd apps/mobile && pnpm dlx eas-cli init` で projectId を自動生成
+#   3. https://expo.dev/accounts/[account]/settings/access-tokens で token 発行
+#   4. GitHub Secrets に EXPO_TOKEN を登録
+#   5. GitHub Variables に EAS_PREVIEW_ENABLED=true を登録
+#      （Settings → Secrets and variables → Actions → Variables タブ）
+#
+# vars.EAS_PREVIEW_ENABLED が "true" になるまでこのジョブは Skipped となり、
+# 未設定状態でも CI が赤くならない。
+
+on:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/preview.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    name: Publish EAS Update
+    if: vars.EAS_PREVIEW_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish preview update
+        working-directory: apps/mobile
+        run: eas update --auto --branch pr-${{ github.event.pull_request.number }} --message "${{ github.event.pull_request.title }}"
