@@ -3,9 +3,11 @@
  * shari のルート ESLint 設定（flat config）。
  * - Prettier と衝突するスタイル系ルールは eslint-config-prettier で off
  * - 型チェックは別途 `pnpm typecheck`（tsc --noEmit）で担当
+ * - React Hooks ルールは apps/mobile に限定して適用
  */
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
+import reactHooks from "eslint-plugin-react-hooks";
 import ts from "typescript-eslint";
 
 export default ts.config(
@@ -38,6 +40,16 @@ export default ts.config(
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  {
+    files: ["apps/mobile/**/*.{ts,tsx}"],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
     },
   },
   prettier,
