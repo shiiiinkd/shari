@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+.next
+.expo
+.expo-shared
+.turbo
+.wrangler
+coverage
+pnpm-lock.yaml
+*.tsbuildinfo
+android
+ios
+apps/backend/.wrangler
+apps/mobile/.expo

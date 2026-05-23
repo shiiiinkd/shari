@@ -18,7 +18,9 @@ function HelloScreen() {
       <View style={styles.errorBox}>
         <Text style={styles.errorTitle}>接続失敗</Text>
         <Text style={styles.errorMessage}>{error.message}</Text>
-        <Text style={styles.hint}>backend (pnpm --filter @shari/backend dev) を起動していますか？</Text>
+        <Text style={styles.hint}>
+          backend (pnpm --filter @shari/backend dev) を起動していますか？
+        </Text>
       </View>
     );
   }

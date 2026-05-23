@@ -8,14 +8,12 @@ import { publicProcedure, router } from "./trpc.js";
 
 export const appRouter = router({
   /** 疎通確認用。最初のend-to-endテストで使う。 */
-  hello: publicProcedure
-    .input(z.object({ name: z.string().min(1).max(50) }))
-    .query(({ input }) => {
-      return {
-        message: `こんにちは、${input.name}さん。Shariへようこそ🍣`,
-        timestamp: new Date().toISOString(),
-      };
-    }),
+  hello: publicProcedure.input(z.object({ name: z.string().min(1).max(50) })).query(({ input }) => {
+    return {
+      message: `こんにちは、${input.name}さん。Shariへようこそ🍣`,
+      timestamp: new Date().toISOString(),
+    };
+  }),
 });
 
 export type AppRouter = typeof appRouter;

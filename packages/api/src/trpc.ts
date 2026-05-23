@@ -8,12 +8,12 @@ import { initTRPC } from "@trpc/server";
 /**
  * Record互換にするため type alias で定義（interface だと @hono/trpc-server の
  * Record<string, unknown> 制約に空オブジェクトが入らない）。
+ * 認証ユーザー情報や Supabase クライアントを後でここに足す:
+ *   user?: { id: string };
+ *   supabase?: SupabaseClient;
  */
-export type TRPCContext = {
-  // 認証ユーザー情報やSupabaseクライアントを後でここに足す
-  // user?: { id: string };
-  // supabase?: SupabaseClient;
-};
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type TRPCContext = {};
 
 const t = initTRPC.context<TRPCContext>().create();
 

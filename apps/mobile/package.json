@@ -10,7 +10,6 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
     "clean": "rm -rf node_modules .turbo .expo"
   },
   "dependencies": {

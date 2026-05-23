@@ -36,15 +36,15 @@ description: shari プロジェクト用に Conventional Commits（種別=英語
 
 ## scope の判定ルール
 
-| 変更パス | scope |
-| --- | --- |
-| `apps/mobile/**` | `mobile` |
-| `apps/backend/**` | `backend` |
-| `packages/api/**` | `api` |
-| `packages/shared/**` | `shared` |
-| `wrangler.toml` / `turbo.json` / `pnpm-workspace.yaml` / `tsconfig.base.json` | `infra` |
-| `CLAUDE.md` / `.claude/**` / `README.md` / `docs/**` | `repo` |
-| 2つ以上にまたがる | `repo` |
+| 変更パス                                                                      | scope     |
+| ----------------------------------------------------------------------------- | --------- |
+| `apps/mobile/**`                                                              | `mobile`  |
+| `apps/backend/**`                                                             | `backend` |
+| `packages/api/**`                                                             | `api`     |
+| `packages/shared/**`                                                          | `shared`  |
+| `wrangler.toml` / `turbo.json` / `pnpm-workspace.yaml` / `tsconfig.base.json` | `infra`   |
+| `CLAUDE.md` / `.claude/**` / `README.md` / `docs/**`                          | `repo`    |
+| 2つ以上にまたがる                                                             | `repo`    |
 
 ## 良い例
 

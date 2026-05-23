@@ -17,11 +17,13 @@
 ### MVP スコープ
 
 含む:
+
 - YouTube URL からの字幕取得（YouTube Transcript API・字幕あり動画のみ）
 - Claude API での要約 + 日本語翻訳
 - Qiita / Zenn から関連記事検索
 
 含まない（Phase 2以降）:
+
 - 字幕なし動画（Whisper による文字起こし）
 - 図解生成 / 英語学習モード / Notion・Obsidian 連携 / LINE 共有 / チャンネル定期要約 / Share Extension
 
@@ -117,15 +119,15 @@ shari/
 
 ## 5. 技術選定の根拠
 
-| 技術 | 選定理由 |
-| --- | --- |
-| **Hono** | 日本人開発者作・エッジ対応・TypeScript完全対応 |
-| **tRPC + Zod** | フロント〜バック間の型安全を担保・APIドキュメント不要 |
-| **Cloudflare Workers** | 東京リージョン・無料枠10万req/日・サーバーレス |
-| **Supabase** | OSS・ロックインなし・無料枠で開始可能・Auth/Storage同梱 |
-| **Claude API** | 現時点で最高水準の日本語生成品質 |
-| **Expo (Bare ではなく Managed)** | iOS/Android 同時対応のコスト最小化。Share Extension 必要になったら Bare 移行検討 |
-| **pnpm@11 + Turborepo** | monorepo + tRPC スタックのデファクト。`overrides` で react / react-native の単一バージョンを強制（Expo の必須要件） |
+| 技術                             | 選定理由                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Hono**                         | 日本人開発者作・エッジ対応・TypeScript完全対応                                                                      |
+| **tRPC + Zod**                   | フロント〜バック間の型安全を担保・APIドキュメント不要                                                               |
+| **Cloudflare Workers**           | 東京リージョン・無料枠10万req/日・サーバーレス                                                                      |
+| **Supabase**                     | OSS・ロックインなし・無料枠で開始可能・Auth/Storage同梱                                                             |
+| **Claude API**                   | 現時点で最高水準の日本語生成品質                                                                                    |
+| **Expo (Bare ではなく Managed)** | iOS/Android 同時対応のコスト最小化。Share Extension 必要になったら Bare 移行検討                                    |
+| **pnpm@11 + Turborepo**          | monorepo + tRPC スタックのデファクト。`overrides` で react / react-native の単一バージョンを強制（Expo の必須要件） |
 
 ---
 
@@ -133,13 +135,13 @@ shari/
 
 `.env.example` を `.env` にコピー（backend は `.dev.vars` を使用）。
 
-| キー | 用途 | 配置先 |
-| --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Claude API | Cloudflare Workers Secret（本番）/ `.dev.vars`（ローカル） |
-| `SUPABASE_URL` | Supabase エンドポイント | Workers Secret + Expo `EXPO_PUBLIC_*` |
-| `SUPABASE_ANON_KEY` | Supabase クライアント鍵 | Workers Secret + Expo `EXPO_PUBLIC_*` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase サーバ専用鍵 | **Workers Secret のみ**（mobile には絶対に渡さない） |
-| `QIITA_TOKEN` | Qiita API（任意・レート制限緩和用） | Workers Secret |
+| キー                        | 用途                                | 配置先                                                     |
+| --------------------------- | ----------------------------------- | ---------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`         | Claude API                          | Cloudflare Workers Secret（本番）/ `.dev.vars`（ローカル） |
+| `SUPABASE_URL`              | Supabase エンドポイント             | Workers Secret + Expo `EXPO_PUBLIC_*`                      |
+| `SUPABASE_ANON_KEY`         | Supabase クライアント鍵             | Workers Secret + Expo `EXPO_PUBLIC_*`                      |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase サーバ専用鍵               | **Workers Secret のみ**（mobile には絶対に渡さない）       |
+| `QIITA_TOKEN`               | Qiita API（任意・レート制限緩和用） | Workers Secret                                             |
 
 `.env` / `.dev.vars` は `.gitignore` 済み。コミットしてはいけない。
 
@@ -147,13 +149,13 @@ shari/
 
 ## 7. コスト構造
 
-| ステップ | 手段 | コスト |
-| --- | --- | --- |
-| 字幕取得（字幕あり・約90%） | YouTube Transcript API | 無料 |
-| 字幕取得（字幕なし・約10%） | MVP対象外 | — |
-| 要約・翻訳 | Claude API | 約 ¥10〜15 / 動画 |
-| 関連記事検索 | Qiita / Zenn API | 無料 |
-| インフラ | Cloudflare Workers + Supabase | 無料枠で開始 |
+| ステップ                    | 手段                          | コスト            |
+| --------------------------- | ----------------------------- | ----------------- |
+| 字幕取得（字幕あり・約90%） | YouTube Transcript API        | 無料              |
+| 字幕取得（字幕なし・約10%） | MVP対象外                     | —                 |
+| 要約・翻訳                  | Claude API                    | 約 ¥10〜15 / 動画 |
+| 関連記事検索                | Qiita / Zenn API              | 無料              |
+| インフラ                    | Cloudflare Workers + Supabase | 無料枠で開始      |
 
 **加重平均コスト**: 約 ¥10〜15 / 動画。**Pro 有料ユーザー 約400名で月次黒字化**が目安。
 
