@@ -14,7 +14,9 @@
     "clean": "rm -rf node_modules .turbo .expo"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.1.0",
     "@shari/api": "workspace:*",
+    "@supabase/supabase-js": "^2.106.1",
     "@tanstack/react-query": "^5.62.11",
     "@trpc/client": "11.17.0",
     "@trpc/react-query": "11.17.0",
