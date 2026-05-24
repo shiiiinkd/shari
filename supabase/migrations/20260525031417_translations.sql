@@ -20,7 +20,10 @@ create table public.translations (
 );
 
 -- RLS: 既存キャッシュ系（videos / transcripts / summaries / related_articles）と揃える。
--- 認証済みユーザーは SELECT 可、書き込みは service_role のみ（policy を作らないことで拒否される）。
+-- 認証済みユーザーは SELECT 可、書き込みは service_role のみ。
+-- INSERT / UPDATE / DELETE のポリシーを敢えて作らないことで anon / authenticated は
+-- 書き込み拒否（RLS デフォルト動作）。service_role は RLS をバイパスするので
+-- backend からの書き込みは通る。20260523173959_initial_schema.sql §9 と同じ規約。
 alter table public.translations enable row level security;
 
 create policy translations_select_all

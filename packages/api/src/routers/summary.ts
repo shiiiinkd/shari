@@ -179,11 +179,21 @@ export const summaryRouter = router({
       //    Claude 要約呼び出しの直前に挟む。
       //    PK は (video_id, source_language, target_language)。同じ key の再翻訳は upsert で
       //    上書きする方針（prompt_version は記録目的で残すが lookup 条件には入れない）。
+      //
+      //    判定は BCP47 の base language tag（最初の `-` 以前）で行う。YouTube は
+      //    `en-US` / `en-GB` 等の locale 付き languageCode を返すことがあり、素朴な
+      //    文字列比較だと en-US → en で無意味な翻訳が走り Claude コストが二重化する。
+      //
+      //    race window: 同一動画への同時要求では translations のキャッシュ確認 → translate
+      //    → upsert の間に Claude が二重に呼ばれうる。PK 衝突は upsert で吸収するが Claude
+      //    呼び出しの重複は防げない。同一動画同時要求は実運用では稀なので当面許容し、
+      //    本格対策は別 PR（Durable Object 等）に分離する。
       const rawTranscriptText = transcriptSegments.map((s) => s.text).join(" ");
       let transcriptText = rawTranscriptText;
       let summarizeInputLanguage = transcriptLanguage;
 
-      if (transcriptLanguage !== language) {
+      const baseLang = (s: string): string => s.split("-")[0]?.toLowerCase() ?? s.toLowerCase();
+      if (baseLang(transcriptLanguage) !== baseLang(language)) {
         const translationLookup = await ctx.supabase
           .from("translations")
           .select("translated_text")
