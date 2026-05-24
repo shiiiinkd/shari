@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ensureSession, supabase } from "./src/lib/supabase";
 import { TRPC_URL, trpc } from "./src/lib/trpc";
 
 /**
@@ -34,12 +35,53 @@ function HelloScreen() {
 }
 
 export default function App() {
+  // セッション準備が終わるまで splash を見せる。
+  // ensureSession が走ると AsyncStorage 経由で永続化されるので、2回目以降は即解決する。
+  const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    ensureSession()
+      .then(() => setAuthReady(true))
+      .catch((e: unknown) => setAuthError(e instanceof Error ? e.message : String(e)));
+  }, []);
+
   const [queryClient] = useState(() => new QueryClient());
   const [trpcClient] = useState(() =>
     trpc.createClient({
-      links: [httpBatchLink({ url: TRPC_URL })],
+      links: [
+        httpBatchLink({
+          url: TRPC_URL,
+          // 各リクエストで最新の access_token を Authorization に乗せる。
+          // ヘッダは関数として渡すことで、毎リクエスト直前に評価される。
+          headers: async () => {
+            const { data } = await supabase.auth.getSession();
+            const token = data.session?.access_token;
+            return token ? { Authorization: `Bearer ${token}` } : {};
+          },
+        }),
+      ],
     }),
   );
+
+  if (authError) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>セッション初期化失敗</Text>
+          <Text style={styles.errorMessage}>{authError}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!authReady) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>

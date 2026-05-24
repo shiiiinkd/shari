@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@shari/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.106.1",
     "@trpc/server": "11.17.0",
     "zod": "^3.24.1"
   },
