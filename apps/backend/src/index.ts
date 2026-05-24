@@ -40,12 +40,20 @@ app.use(
       const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
       // Authorization: Bearer <jwt> から user を解決。無効/未指定なら undefined のまま。
+      // Supabase Auth 側の一時障害・ネットワーク不調を「未ログイン」と握り潰すと
+      // protectedProcedure が UNAUTHORIZED を返し、クライアントからは「未ログイン」に
+      // しか見えず原因切り分けが困難になる。error はログに残して観測可能にする。
       let user: { id: string } | undefined;
       const authHeader = c.req.header("authorization");
       if (authHeader?.startsWith("Bearer ")) {
         const token = authHeader.slice("Bearer ".length);
         const { data, error } = await supabase.auth.getUser(token);
-        if (!error && data.user) {
+        if (error) {
+          console.warn("auth_get_user_failed", {
+            message: error.message,
+            status: error.status,
+          });
+        } else if (data.user) {
           user = { id: data.user.id };
         }
       }
