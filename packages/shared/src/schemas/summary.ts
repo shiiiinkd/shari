@@ -7,7 +7,7 @@
  * 対応する DB 列の設計根拠は docs/data-model.md §3.4 (summaries テーブル) 参照。
  */
 import { z } from "zod";
-import { videoIdSchema } from "./youtube.js";
+import { videoIdSchema, youtubeUrlSchema } from "./youtube.js";
 
 /** 要約の出力言語。MVP では 'ja' のみ実運用想定だが、将来 en 対応の余地を残す。 */
 export const summaryLanguageSchema = z.enum(["ja", "en"]);
@@ -30,9 +30,13 @@ export type SummaryRequest = z.infer<typeof summaryRequestSchema>;
 /**
  * tRPC procedure `summary.create` の入力。
  * mobile が叩く外向き IF。内部の Claude SDK 呼び出し用 summaryRequestSchema とは別レイヤ。
+ *
+ * `videoId` フィールドは URL（https://www.youtube.com/watch?v=... / https://youtu.be/...）
+ * か、11 文字の videoId のどちらでも受け付ける。Zod の union 内で URL は
+ * youtubeUrlSchema により videoId に transform される。出力型は常に videoId 文字列。
  */
 export const summaryCreateInputSchema = z.object({
-  videoId: videoIdSchema,
+  videoId: z.union([youtubeUrlSchema, videoIdSchema]),
   /** 出力言語。MVP では実質 'ja' のみ。 */
   language: summaryLanguageSchema.default("ja"),
 });
