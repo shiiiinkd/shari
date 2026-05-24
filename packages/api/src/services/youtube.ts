@@ -106,13 +106,17 @@ function extractMetadata(html: string): YoutubeMetadata {
     throw new TRPCError({ code: "NOT_FOUND", message: "video_meta_unavailable" });
   }
 
-  const durationSec = result.data.lengthSeconds ? Number(result.data.lengthSeconds) : undefined;
+  // ライブ配信 / プレミア公開 / 配信予定の動画は lengthSeconds が "0" になり得る。
+  // videos.duration_sec には CHECK (duration_sec > 0) があるため、0 以下は undefined
+  // に倒して DB 制約と整合させる（NULL は許容されている）。
+  const rawDuration = result.data.lengthSeconds ? Number(result.data.lengthSeconds) : NaN;
+  const durationSec = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : undefined;
 
   return {
     videoTitle: result.data.title,
     channelName: result.data.author,
     channelId: result.data.channelId,
-    durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+    durationSec,
   };
 }
 
