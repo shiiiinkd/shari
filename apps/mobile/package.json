@@ -5,6 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "dev": "expo start",
+    "dev:web": "expo start --web",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -13,7 +14,9 @@
     "clean": "rm -rf node_modules .turbo .expo"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.1.0",
     "@shari/api": "workspace:*",
+    "@supabase/supabase-js": "^2.106.1",
     "@tanstack/react-query": "^5.62.11",
     "@trpc/client": "11.17.0",
     "@trpc/react-query": "11.17.0",
@@ -22,7 +25,9 @@
     "expo-constants": "~56.0.14",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

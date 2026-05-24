@@ -5,6 +5,7 @@
   "description": "YouTube技術動画を日本のエンジニア向けに日本語要約するモバイルアプリ",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "BROWSER=none turbo run dev:web",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "eslint .",
