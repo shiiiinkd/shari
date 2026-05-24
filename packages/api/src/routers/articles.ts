@@ -41,10 +41,15 @@ const videoTitleRowSchema = z.object({
 });
 
 export const articlesRouter = router({
+  // Miss 時に related_articles へ DB 書き込みが走るため副作用あり → .mutation。
+  // tRPC / React Query の前提として .query は副作用無し + 自由に多重実行可能を
+  // 期待されるが、本 procedure はキャッシュ書き込みを伴うため不整合。
+  // 「キャッシュ取得」だが MVP では mutation に倒し、将来「Hit 時専用の query +
+  //  Miss 時の mutation」に分けたくなったタイミングで分離する。
   relatedFor: protectedProcedure
     .input(articlesRelatedForInputSchema)
     .output(articlesRelatedForOutputSchema)
-    .query(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx }) => {
       const { videoId } = input;
       const sevenDaysAgo = new Date(
         Date.now() - CACHE_TTL_DAYS * 24 * 60 * 60 * 1000,
