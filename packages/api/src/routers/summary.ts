@@ -159,21 +159,26 @@ export const summaryRouter = router({
         language,
       });
 
-      // 4. summaries INSERT。unique 制約 (video_id, language, prompt_version) は
-      //    ここに来ている時点で空であることを保証している（手順 1 で確認済み）。
-      const insertRes = await ctx.supabase.from("summaries").insert({
-        video_id: videoId,
-        language,
-        summary_md: result.summaryMd,
-        model: result.model,
-        prompt_version: result.promptVersion,
-        input_tokens: result.inputTokens,
-        output_tokens: result.outputTokens,
-      });
-      if (insertRes.error) {
+      // 4. summaries UPSERT。手順 1 でキャッシュ確認しても、同じ key で並行リクエスト
+      //    が走ると unique 制約 (video_id, language, prompt_version) で衝突しうるため、
+      //    upsert で吸収する。後勝ちで上書きされても同じ prompt_version の出力同士なので
+      //    内容は実質同一（モデル温度なし + adaptive thinking で揺れは小さい）。
+      const upsertRes = await ctx.supabase.from("summaries").upsert(
+        {
+          video_id: videoId,
+          language,
+          summary_md: result.summaryMd,
+          model: result.model,
+          prompt_version: result.promptVersion,
+          input_tokens: result.inputTokens,
+          output_tokens: result.outputTokens,
+        },
+        { onConflict: "video_id,language,prompt_version" },
+      );
+      if (upsertRes.error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `summaries_insert_failed: ${insertRes.error.message}`,
+          message: `summaries_upsert_failed: ${upsertRes.error.message}`,
         });
       }
 
