@@ -3,6 +3,7 @@
  * Context は backend 側（apps/backend）で生成されたものがここに渡る。
  * このパッケージは router の「型定義」を提供するだけで、ランタイム依存は最小に保つ。
  */
+import type { SummaryRequest, SummaryResult } from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError, initTRPC } from "@trpc/server";
 
@@ -21,12 +22,28 @@ export interface ContextEnv {
   ALLOWED_ORIGIN: string;
 }
 
+/**
+ * backend 側の重い依存（Anthropic SDK 等）に packages/api が直接依存しないよう、
+ * 注入可能な service として contract だけ宣言する。実装は apps/backend で組み立て、
+ * createContext から渡す。
+ */
+export interface BackendServices {
+  /** YouTube 字幕 + 動画メタ + 言語指定 を受けて Claude に要約させる。 */
+  summarize: (request: SummaryRequest) => Promise<SummaryResult>;
+  /**
+   * 現在の (prompt template + model) を表すバージョン文字列。
+   * summaries テーブルの cache key として使うため、Claude 呼び出し前に procedure 側で参照する。
+   */
+  currentPromptVersion: string;
+}
+
 export type TRPCContext = {
   env: ContextEnv;
   /** service_role キーで作成された Supabase クライアント（RLS をバイパスする）。 */
   supabase: SupabaseClient;
   /** Authorization: Bearer <jwt> から解決された匿名/通常ユーザー。未認証なら undefined。 */
   user?: { id: string };
+  services: BackendServices;
 };
 
 const t = initTRPC.context<TRPCContext>().create();

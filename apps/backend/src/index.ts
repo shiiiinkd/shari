@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "../worker-configuration.js";
+import { buildPromptVersion, summarizeTranscript } from "./clients/claude.js";
 import { buildCorsOrigin, parseEnv } from "./env.js";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -49,7 +50,15 @@ app.use(
         }
       }
 
-      return { env, supabase, user };
+      // 外部サービスを context に注入。重い SDK を直接 packages/api に持ち込まないため、
+      // backend 側で env を bind した薄いクロージャだけを渡す。
+      const services = {
+        summarize: (request: Parameters<typeof summarizeTranscript>[1]) =>
+          summarizeTranscript(env, request),
+        currentPromptVersion: buildPromptVersion(),
+      };
+
+      return { env, supabase, user, services };
     },
   }),
 );

@@ -5,6 +5,8 @@
  * 新 procedure の追加手順は /add-trpc-procedure skill 参照。
  */
 import { helloInputSchema } from "@shari/shared";
+import { summaryRouter } from "./routers/summary.js";
+import { youtubeRouter } from "./routers/youtube.js";
 import { publicProcedure, router } from "./trpc.js";
 
 export const appRouter = router({
@@ -15,6 +17,12 @@ export const appRouter = router({
       timestamp: new Date().toISOString(),
     };
   }),
+
+  /** YouTube 関連（字幕取得・将来的にメタデータ取得など）。 */
+  youtube: youtubeRouter,
+
+  /** 要約 procedure（Claude API 経由）。 */
+  summary: summaryRouter,
 });
 
 export type AppRouter = typeof appRouter;
