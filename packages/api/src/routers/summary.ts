@@ -22,6 +22,7 @@ import {
   summaryCreateOutputSchema,
   type TranscriptSegment,
 } from "@shari/shared";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fetchYoutubeContent } from "../services/youtube.js";
@@ -189,7 +190,7 @@ export const summaryRouter = router({
 });
 
 async function logRequest(
-  supabase: import("@supabase/supabase-js").SupabaseClient,
+  supabase: SupabaseClient,
   userId: string,
   videoId: string,
   cacheHit: boolean,
