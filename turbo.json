@@ -10,6 +10,10 @@
       "cache": false,
       "persistent": true
     },
+    "dev:web": {
+      "cache": false,
+      "persistent": true
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
