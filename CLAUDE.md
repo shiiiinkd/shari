@@ -86,3 +86,8 @@ pnpm --filter @shari/backend deploy   # Cloudflare Workers にデプロイ
 4. PR は日本語で「背景・変更点・テスト方針」を記述
 5. マージ前に `/code-review` スキルで OWASP + パフォーマンス観点を自己レビュー
 6. コミット作成は `/commit` スキル
+
+## 並列開発（worktree）
+
+複数の Claude Code インスタンスを git worktree で並列に動かす場合は、必ず [docs/worktree-rules.md](./docs/worktree-rules.md) を読んでから着手する。
+（配置・命名・並列禁止の組み合わせ・マージ順序・`.claude-task.md` での担当範囲明示など）
