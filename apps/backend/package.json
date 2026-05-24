@@ -15,6 +15,7 @@
     "@anthropic-ai/sdk": "^0.98.0",
     "@hono/trpc-server": "^0.3.4",
     "@shari/api": "workspace:*",
+    "@shari/shared": "workspace:*",
     "@supabase/supabase-js": "^2.106.1",
     "@trpc/server": "11.17.0",
     "hono": "^4.6.16",
