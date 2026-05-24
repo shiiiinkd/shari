@@ -117,6 +117,9 @@ export const articlesRouter = router({
       }
 
       // 4. キャッシュへ upsert。unique (video_id, url) で重複は握りつぶす。
+      //    fetched_at を明示更新しないと、既存行に衝突した時に default(now()) が走らず
+      //    fetched_at が古いまま固定され、CACHE_TTL_DAYS で永遠に Miss 扱いになる。
+      const fetchedAt = new Date().toISOString();
       const upsertRes = await ctx.supabase.from("related_articles").upsert(
         merged.map((a) => ({
           video_id: videoId,
@@ -124,6 +127,7 @@ export const articlesRouter = router({
           url: a.url,
           title: a.title,
           score: a.score ?? null,
+          fetched_at: fetchedAt,
         })),
         { onConflict: "video_id,url" },
       );
