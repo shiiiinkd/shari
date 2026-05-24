@@ -1,5 +1,5 @@
 /**
- * Claude API による技術動画字幕の要約。
+ * Claude API クライアント。要約・翻訳のシステムプロンプトと低レベル呼び出しを定義する。
  *
  * 設計メモ:
  * - Anthropic 公式 SDK (`@anthropic-ai/sdk`) を使用。fetch ベースで Workers 互換。
@@ -10,6 +10,9 @@
  *   呼び出しは入力トークンの大半が cache_read（〜10% コスト）になる。
  * - thinking content は default の "omitted"（UI に出さないため）。
  * - Opus 4.7 では temperature / top_p / top_k / budget_tokens は使用不可（400）。
+ *
+ * 翻訳の SDK 呼び出し本体は services/translation.ts に分離している。ここでは
+ * 翻訳プロンプトの素材（SYSTEM プロンプト・version 文字列）だけを公開する。
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { type SummaryRequest, type SummaryResult, summaryRequestSchema } from "@shari/shared";
@@ -20,8 +23,14 @@ export const DEFAULT_MODEL = "claude-opus-4-7";
  * システムプロンプト本体のバージョン。
  * SYSTEM_PROMPT 本文を書き換えたら必ず bump すること（DB の prompt_version で
  * 強制再生成させるため）。
+ *
+ * v2-translate-then-summarize: 字幕 → 日本語訳 → 要約の 2 段構成に切替。
+ * summarize の入力 transcriptText は翻訳済みテキストになる（procedure 側で挿入）。
+ * SYSTEM_PROMPT 本文は変更していないが、入力意味が変わるため bump する。
+ * 既存 summaries キャッシュは (video_id, language, prompt_version) で自然に miss し、
+ * 新方式で再生成される（データ移行不要）。
  */
-export const PROMPT_TEMPLATE_VERSION = "v1";
+export const PROMPT_TEMPLATE_VERSION = "v2-translate-then-summarize";
 
 /**
  * (template, model) の組から prompt_version 文字列を作る。
@@ -117,4 +126,68 @@ export async function summarizeTranscript(
     inputTokens,
     outputTokens: usage.output_tokens,
   };
+}
+
+// ============================================================
+// 翻訳プロンプト
+// ============================================================
+
+/**
+ * 翻訳プロンプトテンプレ本体のバージョン。
+ * TRANSLATION_SYSTEM_PROMPT 本文を書き換えたら bump する。
+ * translations テーブルの PK には含めないため（docs/data-model.md §6）、
+ * 破壊的にプロンプトを変えるときは行を明示的に削除する運用。
+ */
+export const TRANSLATION_PROMPT_TEMPLATE_VERSION = "v1";
+
+/**
+ * 翻訳の prompt_version 文字列。translations テーブルの監査メタとして書き込む
+ * （cache key ではなく traceability 用途）。
+ *
+ * `t-` プレフィックスで要約の `buildPromptVersion` 出力と区別する。
+ * 別テーブルなので衝突はしないが、ログ・監査時に混在しても見分けがつくため。
+ */
+export function buildTranslationPromptVersion(model: string = DEFAULT_MODEL): string {
+  return `t-${TRANSLATION_PROMPT_TEMPLATE_VERSION}-${model}`;
+}
+
+/**
+ * 翻訳用 system プロンプト。
+ * 要約用と分離している理由:
+ * - 翻訳は「意味保存・構造保存」が最優先で、要約のような構成指示は邪魔になる
+ * - cache_control を別物として効かせたい（要約と翻訳で別の cache breakpoint）
+ */
+export const TRANSLATION_SYSTEM_PROMPT = `あなたはソフトウェアエンジニア向けの技術翻訳者です。YouTube 動画の字幕を、後段の要約処理が読みやすいように指定言語へ翻訳します。
+
+# 翻訳方針
+
+- 意味と論理構造を保存する。意訳しすぎず、原文の主張・順序・因果関係をそのまま運ぶ。
+- 技術用語・固有名詞・OSS 名・製品名・コード片は原語のまま残す（例: "embedding", "garbage collector", "Rust", "PostgreSQL"）。日本語に置き換えると意味が痩せるため。
+- 字幕特有のノイズ（filler words: "you know", "like", "um"、繰り返し、明らかな書き起こしミス）は読みやすさのために整える。ただし内容自体は改変しない。
+- 段落単位で自然な文章にまとめる。元の字幕の改行位置やタイムスタンプ単位の細切れに引きずられない。
+- 推測・要約・補足を加えない。後段の要約 LLM がそれをやる。あなたの仕事は「言語を変える」だけ。
+- 出力は翻訳本文のみ。「以下に翻訳します」のような枕詞・前置き・締めの挨拶は不要。`;
+
+/**
+ * 翻訳の user プロンプト本体を組み立てる。
+ * 翻訳の SDK 呼び出し本体（services/translation.ts）から参照される。
+ */
+export function buildTranslationUserPrompt(input: {
+  videoTitle: string;
+  channelName: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  sourceText: string;
+}): string {
+  return [
+    `# 動画`,
+    `タイトル: ${input.videoTitle}`,
+    `チャンネル: ${input.channelName}`,
+    `元言語: ${input.sourceLanguage}`,
+    `訳出言語: ${input.targetLanguage}`,
+    ``,
+    `# 字幕本文（${input.sourceLanguage}）`,
+    ``,
+    input.sourceText,
+  ].join("\n");
 }

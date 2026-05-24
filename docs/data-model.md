@@ -29,6 +29,7 @@ profiles ───────────── subscriptions
     ▼
 requests ─────► videos ──► transcripts
                   │
+                  ├──► translations
                   ├──► summaries
                   └──► related_articles
 ```
@@ -82,6 +83,33 @@ YouTube 動画のメタデータキャッシュ。
 
 **RLS**: 認証済みユーザーは SELECT 可。INSERT / UPDATE は service_role のみ。
 **インデックス**: `(language)`、`text_length` で範囲検索する場合は別途。
+
+### 3.3.1 `translations`（キャッシュ・Claude 翻訳生成物）
+
+字幕 → 日本語訳の中間キャッシュ。要約の前段に挟むことで、英語動画の要約品質を引き上げる。
+直接 transcripts に「日本語訳列」を増やさず別テーブルに切る理由:
+
+- transcripts は YouTube 由来の原文（多言語）のキャッシュであり、Claude 生成物（翻訳）と性質が違う。混ぜると「再生成すべきか」の判断軸（fetched_at vs prompt_version）が崩れる
+- 翻訳プロンプトを将来差し替えたとき、`prompt_version` で自然にキャッシュ miss させたい（summaries と同じ運用）
+- ターゲット言語が複数になっても PK 拡張でそのまま乗る
+
+| カラム            | 型          | 制約 / 備考                                                                 |
+| ----------------- | ----------- | --------------------------------------------------------------------------- |
+| `video_id`        | text        | PK 構成、FK→`videos.id` ON DELETE CASCADE                                   |
+| `source_language` | text        | PK 構成、NOT NULL（例: `'en'`、`transcripts.language` と一致）              |
+| `target_language` | text        | PK 構成、NOT NULL（MVP は `'ja'` のみ）                                     |
+| `translated_text` | text        | NOT NULL（翻訳済み本文。segments に戻さず生テキストで持つ＝要約用途のため） |
+| `model`           | text        | NOT NULL（例: `'claude-opus-4-7'`）                                         |
+| `prompt_version`  | text        | NOT NULL（翻訳プロンプト変更時の再生成判定用）                              |
+| `input_tokens`    | integer     |                                                                             |
+| `output_tokens`   | integer     |                                                                             |
+| `created_at`      | timestamptz | default `now()`                                                             |
+
+**PK**: `(video_id, source_language, target_language)` 複合キー。
+同じ動画でも将来 ターゲット言語を増やせるよう余地を残す。
+**CHECK 制約**: `source_language <> target_language`（同言語ペアは翻訳不要・無駄行防止）。呼び出し側でも事前に skip するが DB 側でも保険として弾く。
+**RLS**: 認証済みユーザーは SELECT 可。INSERT / UPDATE は service_role のみ。
+**インデックス**: PK で十分（lookup は `(video_id, source_language, target_language)` の完全一致）。
 
 ### 3.4 `summaries`（キャッシュ・Claude 生成物）
 
@@ -152,12 +180,13 @@ Stripe 等の課金連携を入れたときに紐づける器。
 | `profiles`         | ✗    | SELECT / UPDATE 自分のみ | full         |
 | `videos`           | ✗    | SELECT all               | full         |
 | `transcripts`      | ✗    | SELECT all               | full         |
+| `translations`     | ✗    | SELECT all               | full         |
 | `summaries`        | ✗    | SELECT all               | full         |
 | `related_articles` | ✗    | SELECT all               | full         |
 | `requests`         | ✗    | SELECT 自分のみ          | full         |
 | `subscriptions`    | ✗    | SELECT 自分のみ          | full         |
 
-**重要**: キャッシュ系（videos / transcripts / summaries / related_articles）への INSERT は **必ず backend（service_role）経由**。mobile から直接 INSERT させない（コスト・整合性の観点）。
+**重要**: キャッシュ系（videos / transcripts / translations / summaries / related_articles）への INSERT は **必ず backend（service_role）経由**。mobile から直接 INSERT させない（コスト・整合性の観点）。
 
 ---
 
@@ -180,6 +209,7 @@ Stripe 等の課金連携を入れたときに紐づける器。
 - **request 記録は cache_hit を含む**: 「Claude を実際に呼んだ回数」と「ユーザー利用回数」を分離して可視化。コスト分析と Free 上限判定で参照するカラムが違う
 - **summaries に user_id を持たせない**: 同じ動画・同じプロンプトverなら誰が要求しても同じ結果＝共有が最適。ユーザー別の付箋メモ等が必要になったら別テーブル `summary_notes(user_id, summary_id, body)` を切る
 - **`profiles.plan` と `subscriptions.plan` の重複**: profiles 側は「現在の実効プラン（高速参照用）」、subscriptions 側は「課金状態の真実」。webhook で subscriptions が更新されたら profiles に反映する trigger を組む
+- **`translations` の PK に `prompt_version` を含めない**: 翻訳は「言語ペア → 同じ意味の別言語」という安定写像で、要約ほどプロンプト差で揺れない。冪等性を優先して `(video_id, source_language, target_language)` の 3 列 PK とし、`prompt_version` は監査用メタとして列に保持する。翻訳プロンプトを破壊的に変えたい時は明示的に行を削除する運用
 
 ---
 

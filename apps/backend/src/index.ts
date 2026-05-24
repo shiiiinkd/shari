@@ -8,8 +8,13 @@ import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "../worker-configuration.js";
-import { buildPromptVersion, summarizeTranscript } from "./clients/claude.js";
+import {
+  buildPromptVersion,
+  buildTranslationPromptVersion,
+  summarizeTranscript,
+} from "./clients/claude.js";
 import { buildCorsOrigin, parseEnv } from "./env.js";
+import { translateTranscript } from "./services/translation.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -63,7 +68,10 @@ app.use(
       const services = {
         summarize: (request: Parameters<typeof summarizeTranscript>[1]) =>
           summarizeTranscript(env, request),
+        translate: (request: Parameters<typeof translateTranscript>[1]) =>
+          translateTranscript(env, request),
         currentPromptVersion: buildPromptVersion(),
+        currentTranslationPromptVersion: buildTranslationPromptVersion(),
       };
 
       return { env, supabase, user, services };

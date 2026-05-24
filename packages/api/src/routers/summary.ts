@@ -5,16 +5,22 @@
  *   1. summaries キャッシュ Hit?
  *      Yes → そのまま返却（requests.cache_hit=true で log）
  *   2. videos + transcripts キャッシュ Hit?
- *      Yes → YouTube fetch スキップ。Claude 呼ぶ
- *      No → YouTube から meta+字幕を 1 fetch → videos / transcripts に upsert
- *   3. Claude で要約 → summaries に insert
- *   4. requests に log（cache_hit=false）
+ *      Yes → YouTube fetch スキップ
+ *      No  → YouTube から meta+字幕を 1 fetch → videos / transcripts に upsert
+ *   3. **翻訳ステップ**（v2-translate-then-summarize 以降）:
+ *      字幕言語 == 要約出力言語なら skip。
+ *      それ以外は translations キャッシュ確認 → 取得 or 生成 → upsert。
+ *   4. Claude で要約（入力は翻訳済みテキスト or 元字幕）
+ *   5. summaries に upsert
+ *   6. requests に log（cache_hit=false）
  *
  * 認証: protectedProcedure。匿名サインインで取得した user_id を requests / 将来の Free 上限判定に使う。
  *
  * 注意:
  *   - キャッシュキーは (video_id, language, prompt_version)。prompt_version は ctx 経由で取得
  *     することで、Claude SDK 依存を packages/api に持ち込まない
+ *   - translations の PK は (video_id, source_language, target_language)。prompt_version は
+ *     列としては保持するが lookup 条件には入れない（同じ key で再翻訳しても上書きする方針）
  *   - DB 列は snake_case、procedure 入出力は camelCase（@shari/shared schema 準拠）
  */
 import {
@@ -47,6 +53,10 @@ const cachedTranscriptSchema = z.object({
 const cachedVideoSchema = z.object({
   title: z.string(),
   channel_name: z.string(),
+});
+
+const cachedTranslationSchema = z.object({
+  translated_text: z.string(),
 });
 
 export const summaryRouter = router({
@@ -164,18 +174,81 @@ export const summaryRouter = router({
         }
       }
 
-      // 3. Claude 呼び出し
-      const transcriptText = transcriptSegments.map((s) => s.text).join(" ");
+      // 3. 翻訳ステップ（字幕言語 != 出力言語 のときのみ）
+      //    要約は翻訳済みテキストで行うほうが日本語品質が安定するため、
+      //    Claude 要約呼び出しの直前に挟む。
+      //    PK は (video_id, source_language, target_language)。同じ key の再翻訳は upsert で
+      //    上書きする方針（prompt_version は記録目的で残すが lookup 条件には入れない）。
+      const rawTranscriptText = transcriptSegments.map((s) => s.text).join(" ");
+      let transcriptText = rawTranscriptText;
+      let summarizeInputLanguage = transcriptLanguage;
+
+      if (transcriptLanguage !== language) {
+        const translationLookup = await ctx.supabase
+          .from("translations")
+          .select("translated_text")
+          .eq("video_id", videoId)
+          .eq("source_language", transcriptLanguage)
+          .eq("target_language", language)
+          .maybeSingle();
+
+        if (translationLookup.error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `translations_cache_lookup_failed: ${translationLookup.error.message}`,
+          });
+        }
+
+        if (translationLookup.data) {
+          transcriptText = cachedTranslationSchema.parse(translationLookup.data).translated_text;
+        } else {
+          const translation = await ctx.services.translate({
+            videoId,
+            videoTitle,
+            channelName,
+            sourceText: rawTranscriptText,
+            sourceLanguage: transcriptLanguage,
+            targetLanguage: language,
+          });
+
+          const translationUpsert = await ctx.supabase.from("translations").upsert(
+            {
+              video_id: videoId,
+              source_language: transcriptLanguage,
+              target_language: language,
+              translated_text: translation.translatedText,
+              model: translation.model,
+              prompt_version: translation.promptVersion,
+              input_tokens: translation.inputTokens,
+              output_tokens: translation.outputTokens,
+            },
+            { onConflict: "video_id,source_language,target_language" },
+          );
+          if (translationUpsert.error) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `translations_upsert_failed: ${translationUpsert.error.message}`,
+            });
+          }
+
+          transcriptText = translation.translatedText;
+        }
+
+        // 翻訳済みテキストの「言語」は出力言語と一致する。summarize に正しく伝える。
+        summarizeInputLanguage = language;
+      }
+
+      // 4. Claude 呼び出し（入力は翻訳済み or 元字幕）
       const result = await ctx.services.summarize({
         videoId,
         videoTitle,
         channelName,
         transcriptText,
-        transcriptLanguage,
+        transcriptLanguage: summarizeInputLanguage,
         language,
       });
 
-      // 4. summaries UPSERT。手順 1 でキャッシュ確認しても、同じ key で並行リクエスト
+      // 5. summaries UPSERT。手順 1 でキャッシュ確認しても、同じ key で並行リクエスト
       //    が走ると unique 制約 (video_id, language, prompt_version) で衝突しうるため、
       //    upsert で吸収する。後勝ちで上書きされても同じ prompt_version の出力同士なので
       //    内容は実質同一（モデル温度なし + adaptive thinking で揺れは小さい）。
@@ -198,7 +271,7 @@ export const summaryRouter = router({
         });
       }
 
-      // 5. requests ログ
+      // 6. requests ログ
       await logRequest(ctx.supabase, userId, videoId, false);
 
       return {

@@ -3,7 +3,12 @@
  * Context は backend 側（apps/backend）で生成されたものがここに渡る。
  * このパッケージは router の「型定義」を提供するだけで、ランタイム依存は最小に保つ。
  */
-import type { SummaryRequest, SummaryResult } from "@shari/shared";
+import type {
+  SummaryRequest,
+  SummaryResult,
+  TranslateRequest,
+  TranslateResult,
+} from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError, initTRPC } from "@trpc/server";
 
@@ -31,10 +36,20 @@ export interface BackendServices {
   /** YouTube 字幕 + 動画メタ + 言語指定 を受けて Claude に要約させる。 */
   summarize: (request: SummaryRequest) => Promise<SummaryResult>;
   /**
+   * 字幕本文 + 元/翻訳先言語 を受けて Claude に翻訳させる。
+   * 要約処理の前段で呼び出され、translations テーブルにキャッシュされる。
+   */
+  translate: (request: TranslateRequest) => Promise<TranslateResult>;
+  /**
    * 現在の (prompt template + model) を表すバージョン文字列。
    * summaries テーブルの cache key として使うため、Claude 呼び出し前に procedure 側で参照する。
    */
   currentPromptVersion: string;
+  /**
+   * 現在の翻訳プロンプトの (template + model) バージョン文字列。
+   * translations テーブルへの書き込み時にキャッシュキーとして併用する。
+   */
+  currentTranslationPromptVersion: string;
 }
 
 export type TRPCContext = {
