@@ -15,6 +15,9 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
+  // OS 標準共有メニュー（YouTube → shari）から起動するための custom URL scheme。
+  // iOS は MVP で本 scheme + "他アプリで開く" 経由。Universal Links は Phase 2 以降。
+  scheme: "shari",
   runtimeVersion: {
     policy: "sdkVersion",
   },
@@ -29,6 +32,15 @@ const config: ExpoConfig = {
       monochromeImage: "./assets/android-icon-monochrome.png",
     },
     predictiveBackGestureEnabled: false,
+    // YouTube アプリの「共有」は URL を text/plain として ACTION_SEND で渡してくる。
+    // 受け取った text は起動時に Linking 経由で抽出する（src/lib/shareIntent.ts）。
+    intentFilters: [
+      {
+        action: "SEND",
+        category: ["DEFAULT"],
+        data: { mimeType: "text/plain" },
+      },
+    ],
   },
   web: {
     favicon: "./assets/favicon.png",
