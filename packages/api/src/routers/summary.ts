@@ -95,13 +95,29 @@ export const summaryRouter = router({
           .maybeSingle(),
       ]);
 
+      // DB 障害 / 権限エラーは「キャッシュ Miss」と区別する。これを Miss 扱いすると
+      // YouTube fetch にフォールバック → upsert で再エラー、で原因が不可視になるため
+      // ここで明示的に落とす。
+      if (videoRow.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `videos_cache_lookup_failed: ${videoRow.error.message}`,
+        });
+      }
+      if (transcriptRow.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `transcripts_cache_lookup_failed: ${transcriptRow.error.message}`,
+        });
+      }
+
       let videoTitle: string;
       let channelName: string;
       let transcriptLanguage: string;
       let transcriptSegments: TranscriptSegment[];
 
-      const videoCached = !videoRow.error && videoRow.data !== null;
-      const transcriptCached = !transcriptRow.error && transcriptRow.data !== null;
+      const videoCached = videoRow.data !== null;
+      const transcriptCached = transcriptRow.data !== null;
 
       if (videoCached && transcriptCached) {
         const v = cachedVideoSchema.parse(videoRow.data);
