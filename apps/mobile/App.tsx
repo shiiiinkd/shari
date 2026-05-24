@@ -54,8 +54,14 @@ export default function App() {
           url: TRPC_URL,
           // 各リクエストで最新の access_token を Authorization に乗せる。
           // ヘッダは関数として渡すことで、毎リクエスト直前に評価される。
+          // getSession の error を握り潰すと「ヘッダ無し → API 側 UNAUTHORIZED」
+          // しか観測できず認証系不具合の切り分けが困難になるため、警告ログを残す。
           headers: async () => {
-            const { data } = await supabase.auth.getSession();
+            const { data, error } = await supabase.auth.getSession();
+            if (error) {
+              console.warn("trpc_header_get_session_failed", error.message);
+              return {};
+            }
             const token = data.session?.access_token;
             return token ? { Authorization: `Bearer ${token}` } : {};
           },
