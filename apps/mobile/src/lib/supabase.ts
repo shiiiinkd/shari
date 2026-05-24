@@ -31,7 +31,13 @@ export const supabase = createClient(url, anonKey, {
  * App の最初のレンダリング前に必ず通す（tRPC ヘッダで access_token が必要なため）。
  */
 export async function ensureSession(): Promise<string> {
-  const { data: sessionData } = await supabase.auth.getSession();
+  // AsyncStorage 読み取り失敗等で getSession 自身が error を返すケースを握り潰さない。
+  // ここで握り潰すと「永遠に signInAnonymously に流れる」「splash が解除されない」
+  // 等の症状が出て原因切り分けが困難になる。
+  const { data: sessionData, error: getSessionError } = await supabase.auth.getSession();
+  if (getSessionError) {
+    throw new Error(`セッション取得に失敗しました: ${getSessionError.message}`);
+  }
   if (sessionData.session) {
     return sessionData.session.access_token;
   }
