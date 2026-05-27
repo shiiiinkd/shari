@@ -7,4 +7,4 @@ export {
   normalizeError,
   type ErrorCode,
   type NormalizableError,
-} from "@shari/shared";
+} from "@shari/shared/errors";
