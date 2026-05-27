@@ -68,10 +68,12 @@ class SupadataProvider implements TranscriptProvider {
       });
     }
     if (res.status === 401 || res.status === 403) {
-      // API キー不正 / 権限不足。利用者には汎用エラーを返しつつ運用ログに残す。
+      // API キー不正 / 権限不足は利用者側で対処不能の設定不備。詳細 (status) は
+      // 運用ログに残し、クライアントには内部情報を露出しない汎用メッセージを返す。
+      console.error("supadata_auth_failed", { status: res.status });
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: `supadata_auth_failed: ${res.status}`,
+        message: "transcript_service_unavailable",
       });
     }
     if (res.status === 429) {
