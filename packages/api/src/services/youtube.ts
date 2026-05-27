@@ -53,8 +53,11 @@ export async function fetchYoutubeMetadata(videoId: string): Promise<YoutubeMeta
   const json: unknown = await res.json();
   const parsed = oembedSchema.safeParse(json);
   if (!parsed.success) {
+    // 動画が無い (404 で先に弾かれる) のではなく、oEmbed の仕様変更 / 一時障害で
+    // 想定外の shape が返った状況。クライアントに「動画なし」と誤解させないため
+    // upstream 異常として BAD_GATEWAY で扱う。
     throw new TRPCError({
-      code: "NOT_FOUND",
+      code: "BAD_GATEWAY",
       message: "youtube_oembed_unexpected_shape",
     });
   }
