@@ -12,7 +12,13 @@
  * - Opus 4.7 では temperature / top_p / top_k / budget_tokens は使用不可（400）。
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { type SummaryRequest, type SummaryResult, summaryRequestSchema } from "@shari/shared";
+import {
+  LLM_OVERLOADED_SLUG,
+  type SummaryRequest,
+  type SummaryResult,
+  summaryRequestSchema,
+} from "@shari/shared";
+import { TRPCError } from "@trpc/server";
 
 export const DEFAULT_MODEL = "claude-opus-4-7";
 
@@ -54,6 +60,20 @@ export interface SummarizeOptions {
   model?: string;
 }
 
+/**
+ * Anthropic API のレスポンスが「過負荷」起因かを判定する。
+ *   - HTTP 529 を返すケース
+ *   - body に `{"error": {"type": "overloaded_error"}}` を含むケース
+ * SDK のクラス比較は bundle 越境で instanceof が滑ることがあるため duck-type で見る。
+ */
+function isOverloadedError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: unknown; error?: { error?: { type?: unknown } } };
+  if (e.status === 529) return true;
+  if (e.error?.error?.type === "overloaded_error") return true;
+  return false;
+}
+
 export async function summarizeTranscript(
   env: { ANTHROPIC_API_KEY: string },
   rawRequest: SummaryRequest,
@@ -91,7 +111,23 @@ export async function summarizeTranscript(
     messages: [{ role: "user", content: userPrompt }],
   });
 
-  const finalMessage = await stream.finalMessage();
+  let finalMessage: Anthropic.Message;
+  try {
+    finalMessage = await stream.finalMessage();
+  } catch (err) {
+    // Anthropic 側が一時的に過負荷の場合は HTTP 529 + body.type="overloaded_error"。
+    // INTERNAL_SERVER_ERROR のまま再 throw すると mobile では "通信エラー" に潰れて
+    // 「アプリ側のバグ」と誤解されるため、BAD_GATEWAY (= UPSTREAM_FAILED) に変換して
+    // 「外部サービスで一時的なエラー」として表示させる。
+    if (isOverloadedError(err)) {
+      throw new TRPCError({
+        code: "BAD_GATEWAY",
+        message: `${LLM_OVERLOADED_SLUG}: Anthropic API is currently overloaded`,
+        cause: err,
+      });
+    }
+    throw err;
+  }
 
   const summaryMd = finalMessage.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
