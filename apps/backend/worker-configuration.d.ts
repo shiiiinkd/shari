@@ -13,6 +13,12 @@ export interface Env {
   /** "claude" / "gemini"。未設定は claude。Phase 2 で Gemini を追加予定。 */
   LLM_PROVIDER?: string;
 
+  // --- Transcript provider ---
+  /** 字幕取得 SaaS の API key。MVP は Supadata。 */
+  SUPADATA_API_KEY: string;
+  /** "supadata" / 将来の self-host 等。未設定は supadata。 */
+  TRANSCRIPT_PROVIDER?: string;
+
   // --- Supabase ---
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;

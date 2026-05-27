@@ -10,6 +10,7 @@ import { cors } from "hono/cors";
 import type { Env } from "../worker-configuration.js";
 import { createLlmClient } from "./clients/llm.js";
 import { buildCorsOrigin, parseEnv } from "./env.js";
+import { createTranscriptProvider } from "./services/transcript.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -71,11 +72,14 @@ app.use(
 
       // 外部サービスを context に注入。重い SDK / 切替可能 provider を直接 packages/api に
       // 持ち込まないため、backend 側で env を bind したクロージャだけを渡す。
-      // LLM (Claude / Gemini) は factory で env から選んでいる。
+      // LLM (Claude / Gemini) と Transcript provider (Supadata / 将来候補) はそれぞれ
+      // factory で env から選んでいる。
       const llm = createLlmClient(env);
+      const transcript = createTranscriptProvider(env);
       const services = {
         summarize: (request: Parameters<typeof llm.summarize>[0]) => llm.summarize(request),
         currentPromptVersion: llm.promptVersion,
+        fetchTranscript: (videoId: string) => transcript.fetch(videoId),
       };
 
       return { env, supabase, user, services };

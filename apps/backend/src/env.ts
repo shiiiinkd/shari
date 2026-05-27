@@ -7,12 +7,16 @@ import { z } from "zod";
 
 const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1, "ANTHROPIC_API_KEY is required"),
+  /** 字幕取得 SaaS。MVP は Supadata 一択なので必須。 */
+  SUPADATA_API_KEY: z.string().min(1, "SUPADATA_API_KEY is required"),
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a URL"),
   SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
   QIITA_TOKEN: z.string().optional(),
   /** "claude" / "gemini"。未設定は claude。 */
   LLM_PROVIDER: z.string().optional(),
+  /** "supadata" など。未設定は supadata。 */
+  TRANSCRIPT_PROVIDER: z.string().optional(),
   ALLOWED_ORIGIN: z.string().min(1).default("*"),
 });
 

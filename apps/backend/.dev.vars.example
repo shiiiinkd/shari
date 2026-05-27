@@ -11,6 +11,15 @@ ANTHROPIC_API_KEY=
 # "gemini" → Phase 2 で追加予定。現状は throw する
 # LLM_PROVIDER=claude
 
+# --- 字幕取得 (Supadata) ---
+# 必須。https://supadata.ai でサインアップ → API key を取得
+# 無料枠: 100 req / 月程度
+SUPADATA_API_KEY=
+
+# --- Transcript provider 切替 ---
+# 未指定 / "supadata" → Supadata を使う (MVP デフォルト)
+# TRANSCRIPT_PROVIDER=supadata
+
 # --- Supabase ---
 SUPABASE_URL=
 SUPABASE_ANON_KEY=

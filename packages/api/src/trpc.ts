@@ -3,7 +3,7 @@
  * Context は backend 側（apps/backend）で生成されたものがここに渡る。
  * このパッケージは router の「型定義」を提供するだけで、ランタイム依存は最小に保つ。
  */
-import type { SummaryRequest, SummaryResult } from "@shari/shared";
+import type { SummaryRequest, SummaryResult, TranscriptOutput } from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError, initTRPC } from "@trpc/server";
 
@@ -36,6 +36,11 @@ export interface BackendServices {
    * LLM 切替・プロンプト書き換えで値が変わり、自動的に再生成される。
    */
   currentPromptVersion: string;
+  /**
+   * videoId を受けて字幕を取得する。
+   * MVP は Supadata 経由。実装は apps/backend/src/services/transcript.ts。
+   */
+  fetchTranscript: (videoId: string) => Promise<TranscriptOutput>;
 }
 
 export type TRPCContext = {
