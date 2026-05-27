@@ -25,7 +25,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { fetchYoutubeContent } from "../services/youtube.js";
+import { fetchYoutubeMetadata } from "../services/youtube.js";
 import { protectedProcedure, router } from "../trpc.js";
 
 const cachedSummarySchema = z.object({
@@ -127,19 +127,24 @@ export const summaryRouter = router({
         transcriptLanguage = t.language;
         transcriptSegments = t.segments;
       } else {
-        const content = await fetchYoutubeContent(videoId);
-        videoTitle = content.meta.videoTitle;
-        channelName = content.meta.channelName;
-        transcriptLanguage = content.transcript.language;
-        transcriptSegments = content.transcript.segments;
+        // メタと字幕は別 source。oEmbed と Supadata は独立に叩けるので並列化する。
+        // どちらかが失敗したら mutation 全体を fail させたい (Promise.all で揃える)。
+        const [meta, transcript] = await Promise.all([
+          fetchYoutubeMetadata(videoId),
+          ctx.services.fetchTranscript(videoId),
+        ]);
+        videoTitle = meta.videoTitle;
+        channelName = meta.channelName;
+        transcriptLanguage = transcript.language;
+        transcriptSegments = transcript.segments;
 
-        // videos キャッシュに upsert。channel_id / duration_sec は取れたら埋める。
+        // videos キャッシュに upsert。channel_id / duration_sec は oEmbed では取れないので NULL。
         const videoUpsert = await ctx.supabase.from("videos").upsert({
           id: videoId,
           title: videoTitle,
           channel_name: channelName,
-          channel_id: content.meta.channelId ?? null,
-          duration_sec: content.meta.durationSec ?? null,
+          channel_id: meta.channelId ?? null,
+          duration_sec: meta.durationSec ?? null,
           has_transcript: true,
         });
         if (videoUpsert.error) {
@@ -154,7 +159,7 @@ export const summaryRouter = router({
           video_id: videoId,
           language: transcriptLanguage,
           segments: transcriptSegments,
-          text_length: content.transcript.textLength,
+          text_length: transcript.textLength,
         });
         if (transcriptUpsert.error) {
           throw new TRPCError({

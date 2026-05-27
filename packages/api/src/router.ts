@@ -7,7 +7,6 @@
 import { helloInputSchema } from "@shari/shared";
 import { articlesRouter } from "./routers/articles.js";
 import { summaryRouter } from "./routers/summary.js";
-import { youtubeRouter } from "./routers/youtube.js";
 import { publicProcedure, router } from "./trpc.js";
 
 export const appRouter = router({
@@ -18,9 +17,6 @@ export const appRouter = router({
       timestamp: new Date().toISOString(),
     };
   }),
-
-  /** YouTube 関連（字幕取得・将来的にメタデータ取得など）。 */
-  youtube: youtubeRouter,
 
   /** 要約 procedure（Claude / 将来 Gemini への切替可能）。 */
   summary: summaryRouter,
