@@ -2,7 +2,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RelatedArticle } from "@shari/shared";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
-import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { Skeleton } from "../components/Skeleton";
 import { ERROR_CODE_DISPLAY, normalizeError, type ErrorCode } from "../lib/error";
@@ -215,22 +215,62 @@ function ArticlesSection(props: {
         <Text style={styles.emptyText}>関連記事が見つかりませんでした。</Text>
       )}
 
-      {!props.isPending &&
-        props.articles?.map((a) => (
-          <Pressable
-            key={a.url}
-            style={styles.articleCard}
-            onPress={() => {
-              // Linking.openURL は失敗時に reject するため catch しないと
-              // unhandled rejection になる。失敗してもユーザー体験への影響は小さいので静かに無視。
-              Linking.openURL(a.url).catch(() => undefined);
-            }}
-          >
-            <Text style={styles.articleSource}>{a.source}</Text>
-            <Text style={styles.articleTitle}>{a.title}</Text>
-          </Pressable>
-        ))}
+      {!props.isPending && props.articles?.map((a) => <ArticleCard key={a.url} article={a} />)}
     </View>
+  );
+}
+
+/**
+ * Slack ライクなリンクプレビューカード。
+ * 画像 → タイトル → 説明 → 著者（アイコン + 名前 + サイト名）の順で積む。
+ * OGP 取得が失敗した記事は画像エリアを描画せず、テキストのみで縮退表示する。
+ */
+function ArticleCard({ article }: { article: RelatedArticle }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(article.imageUrl) && !imageFailed;
+  const siteName = article.siteName ?? article.source.toUpperCase();
+
+  return (
+    <Pressable
+      style={styles.articleCard}
+      onPress={() => {
+        Linking.openURL(article.url).catch(() => undefined);
+      }}
+      accessibilityRole="link"
+      accessibilityLabel={`${siteName}: ${article.title}`}
+    >
+      {showImage && article.imageUrl && (
+        <Image
+          source={{ uri: article.imageUrl }}
+          style={styles.articleImage}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+        />
+      )}
+      <View style={styles.articleBody}>
+        <Text style={styles.articleSource}>{siteName}</Text>
+        <Text style={styles.articleTitle} numberOfLines={2}>
+          {article.title}
+        </Text>
+        {article.description && (
+          <Text style={styles.articleDescription} numberOfLines={2}>
+            {article.description}
+          </Text>
+        )}
+        {(article.authorName || article.authorIconUrl) && (
+          <View style={styles.articleAuthorRow}>
+            {article.authorIconUrl && (
+              <Image source={{ uri: article.authorIconUrl }} style={styles.articleAuthorIcon} />
+            )}
+            {article.authorName && (
+              <Text style={styles.articleAuthorName} numberOfLines={1}>
+                {article.authorName}
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    </Pressable>
   );
 }
 
@@ -327,11 +367,19 @@ const styles = StyleSheet.create({
     color: "#777",
   },
   articleCard: {
-    padding: 12,
     borderWidth: 1,
     borderColor: "#eee",
     borderRadius: 8,
     backgroundColor: "#fafafa",
+    overflow: "hidden",
+  },
+  articleImage: {
+    width: "100%",
+    aspectRatio: 1.91,
+    backgroundColor: "#eee",
+  },
+  articleBody: {
+    padding: 12,
     gap: 4,
   },
   articleSource: {
@@ -342,6 +390,30 @@ const styles = StyleSheet.create({
   articleTitle: {
     fontSize: 14,
     color: "#111",
+    fontWeight: "600",
+  },
+  articleDescription: {
+    fontSize: 12,
+    color: "#555",
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  articleAuthorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  articleAuthorIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#ddd",
+  },
+  articleAuthorName: {
+    fontSize: 12,
+    color: "#666",
+    flexShrink: 1,
   },
 });
 
