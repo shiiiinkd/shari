@@ -1,16 +1,9 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RelatedArticle } from "@shari/shared";
 import { useEffect } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
+import { Skeleton } from "../components/Skeleton";
 import { ERROR_CODE_DISPLAY, normalizeError, type ErrorCode } from "../lib/error";
 import { trpc } from "../lib/trpc";
 import type { RootStackParamList } from "../navigation/types";
@@ -104,10 +97,17 @@ function SummarySection(props: {
 
   if (props.isPending || !props.summaryMd) {
     return (
-      <View style={styles.loadingBox}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>字幕を取得して要約しています…</Text>
-        <Text style={styles.loadingHint}>初回は 20〜40 秒ほどかかります</Text>
+      <View>
+        <View style={styles.sectionHeader}>
+          <Skeleton width={80} height={20} />
+        </View>
+        <View style={styles.skeletonLines}>
+          <Skeleton height={14} />
+          <Skeleton height={14} />
+          <Skeleton height={14} width="85%" />
+          <Skeleton height={14} width="60%" />
+        </View>
+        <Text style={styles.loadingHint}>字幕を取得して要約中（初回は 20〜40 秒）</Text>
       </View>
     );
   }
@@ -136,9 +136,13 @@ function ArticlesSection(props: {
       <Text style={styles.sectionTitle}>関連記事</Text>
 
       {props.isPending && (
-        <View style={styles.articlesLoading}>
-          <ActivityIndicator />
-          <Text style={styles.loadingHint}>Qiita を検索中…</Text>
+        <View style={styles.articleSkeletonList}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.articleCard}>
+              <Skeleton width={60} height={11} />
+              <Skeleton height={14} width="90%" />
+            </View>
+          ))}
         </View>
       )}
 
@@ -209,14 +213,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  loadingBox: {
-    alignItems: "center",
-    paddingVertical: 32,
+  skeletonLines: {
     gap: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: "#333",
+    marginBottom: 12,
   },
   loadingHint: {
     fontSize: 12,
@@ -254,11 +253,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
-  articlesLoading: {
-    flexDirection: "row",
-    alignItems: "center",
+  articleSkeletonList: {
     gap: 8,
-    paddingVertical: 8,
   },
   emptyText: {
     fontSize: 13,
