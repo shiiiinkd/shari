@@ -33,6 +33,17 @@ app.use(
   "/trpc/*",
   trpcServer({
     router: appRouter,
+    onError: ({ error, path, type }) => {
+      // dev 中の原因特定のため詳細を stderr に出す。production では sentry 等に差し替え。
+      console.error("[trpc] error", {
+        path,
+        type,
+        code: error.code,
+        message: error.message,
+        cause: error.cause instanceof Error ? error.cause.message : error.cause,
+        stack: error.stack?.split("\n").slice(0, 8).join("\n"),
+      });
+    },
     createContext: async (_opts, c): Promise<TRPCContext> => {
       const env = parseEnv(c.env);
 
