@@ -15,10 +15,14 @@ description: ブランチ安全検証 → 必要なら新ブランチ作成 → 
 ### Step 1: 状態把握（並列実行）
 
 ```bash
+git fetch origin main
 git branch --show-current
 git status
-git log main..HEAD --oneline
+git log origin/main...HEAD --oneline
 ```
+
+差分基準は **merge-base**（`A...B` の3点記法）に揃える。`A..B` の2点記法だと
+main 側の進捗を巻き込んだ差分になり、PR本文・シークレットチェックがズレる。
 
 ### Step 2: ブランチ安全検証
 
@@ -45,7 +49,7 @@ git log main..HEAD --oneline
 
 ### Step 3: シークレット混入チェック
 
-`git diff main..HEAD` を確認し、以下が含まれていないかチェックする。
+`git diff origin/main...HEAD` を確認し、以下が含まれていないかチェックする。
 
 - `.env` / `.dev.vars` の実値
 - `ANTHROPIC_API_KEY` / `SUPABASE_*` / `QIITA_TOKEN` の直書き
@@ -63,7 +67,7 @@ mainへのpushは**いかなる理由があっても実行しない**。
 
 ### Step 5: PR作成
 
-`git log main..HEAD` と `git diff main..HEAD` からPRを生成する。
+`git log origin/main...HEAD` と `git diff origin/main...HEAD` からPRを生成する。
 
 #### PRタイトル
 
@@ -73,51 +77,26 @@ mainへのpushは**いかなる理由があっても実行しない**。
 
 #### PR本文
 
-`.github/PULL_REQUEST_TEMPLATE.md` の形式に従い日本語で生成する。
+`.github/PULL_REQUEST_TEMPLATE.md` の各セクション（概要・背景・変更点・影響範囲・動作確認・
+チェックリスト・関連）を埋める形で日本語生成する。テンプレ本体はこの skill 内に複製せず、
+**必ず `.github/PULL_REQUEST_TEMPLATE.md` の最新内容を読んで**それに従う（二重管理回避）。
 
-```markdown
-## 概要
+#### 実行コマンド
 
-<!-- 1〜2行で何が変わるか -->
-
-## 背景・なぜ必要か
-
-<!-- この変更がないとどう困るか -->
-
-## 変更点
-
-- 主要な変更を箇条書き
-- 設計上の判断があれば記載
-
-## 影響範囲
-
-- [ ] mobile（Expo）
-- [ ] backend（Cloudflare Workers）
-- [ ] packages/api（tRPC router 型）
-- [ ] packages/shared（共通 schema）
-- [ ] DB schema（migration を含む）
-- [ ] 環境変数 / シークレット
-- [ ] CI / インフラ設定
-
-## 動作確認
-
-<!-- 確認したコマンドと結果 -->
-
-## チェックリスト
-
-- [ ] pnpm typecheck がクリーン
-- [ ] pnpm lint がクリーン
-- [ ] シークレットをコミットしていない
-```
-
-生成後、以下で実行する:
+`gh pr create --body "..."` は本文中のバッククォートがシェルのコマンド置換として
+評価される危険がある。**必ず HEREDOC + `--body-file` で渡す。**
 
 ```bash
 gh pr create \
   --title "<生成したタイトル>" \
-  --body "<生成した本文>" \
-  --base main
+  --base main \
+  --body-file - <<'EOF'
+<生成した本文をそのまま貼る。クォート不要・展開も起きない>
+EOF
 ```
+
+ヒアドキュメントは `'EOF'` のようにシングルクォートで囲み、`$` やバッククォートが
+展開されない形にする。
 
 ### Step 6: 結果確認
 
