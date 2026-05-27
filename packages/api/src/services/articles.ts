@@ -9,8 +9,8 @@
  *
  * OGP プレビュー（画像・説明）は `fetchOgp` で各記事 URL を fetch して取る。
  * Workers の I/O 並列で同時 fetch する想定（router 側で 3 件まで絞る）。
- * 失敗時は画像なしカードとして縮退表示する。cache miss 時にしか走らず、結果は
- * DB に保存されて以降の cache hit では再 fetch しない。
+ * 失敗時は画像なしカードとして縮退表示する。本サービスは状態を持たず、
+ * router 側のキャッシュ撤廃方針に従って呼び出しごとに毎回フレッシュ取得する。
  *
  * スコアは各サイトのリアクション数を log で正規化して 0〜1 に押し込む（並び順比較用）。
  */
@@ -195,12 +195,14 @@ function decodeEntities(s: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&#(\d+);/g, (_, n) => {
+      // String.fromCodePoint は > 0x10FFFF で RangeError を投げるため上限チェック必須。
+      // ガード抜けで throw すると fetchOgp の catch まで巻き戻り OGP 取得が全滅する。
       const code = Number(n);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : _;
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
     })
     .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
       const code = parseInt(h, 16);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : _;
+      return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : _;
     })
     .replace(/&amp;/g, "&");
 }
