@@ -14,6 +14,11 @@
  *   返るのは title / author_name のみ。channelId / durationSec は oEmbed では取れないが、
  *   videos テーブル側で NULL 許容なので未取得で良い。
  */
+import {
+  VIDEO_UNAVAILABLE_SLUG,
+  YOUTUBE_OEMBED_FAILED_SLUG,
+  YOUTUBE_OEMBED_UNEXPECTED_SHAPE_SLUG,
+} from "@shari/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -40,13 +45,13 @@ export async function fetchYoutubeMetadata(videoId: string): Promise<YoutubeMeta
     // 非公開 / 限定公開 / 削除済 → 利用者に「動画が見つからない」と返したい
     throw new TRPCError({
       code: "NOT_FOUND",
-      message: "video_unavailable: 動画が見つからないか非公開です",
+      message: `${VIDEO_UNAVAILABLE_SLUG}: 動画が見つからないか非公開です`,
     });
   }
   if (!res.ok) {
     throw new TRPCError({
       code: "BAD_GATEWAY",
-      message: `youtube_oembed_failed: ${res.status}`,
+      message: `${YOUTUBE_OEMBED_FAILED_SLUG}: ${res.status}`,
     });
   }
 
@@ -58,7 +63,7 @@ export async function fetchYoutubeMetadata(videoId: string): Promise<YoutubeMeta
     // upstream 異常として BAD_GATEWAY で扱う。
     throw new TRPCError({
       code: "BAD_GATEWAY",
-      message: "youtube_oembed_unexpected_shape",
+      message: YOUTUBE_OEMBED_UNEXPECTED_SHAPE_SLUG,
     });
   }
 
