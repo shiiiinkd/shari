@@ -52,11 +52,16 @@ export async function searchQiita(
 }
 
 /**
- * Zenn は公開検索 API が無いため MVP では未実装。
- * TODO: Zenn RSS feed（topic 別）から候補を引く代替手段を検討。
- * 候補:
+ * Zenn は公開検索 API が無いため MVP では未実装 → **Phase 2 送り**。
+ *
+ * Phase 2 で検討する代替手段:
  *   - https://zenn.dev/topics/<slug>/feed を topic 推定で叩く（topic 抽出が別問題）
  *   - https://zenn.dev/api/articles?topicname=<slug> を JSON で叩く（同上）
+ *
+ * 着手判断:
+ *   MVP では Qiita のみで十分カバーできるか様子見。Qiita 単独だと
+ *   関連記事の質・量が不足すると判断した時点で着手する。詳細な
+ *   未確定事項は docs/data-model.md 参照。
  */
 export async function searchZenn(_query: string): Promise<RelatedArticle[]> {
   return [];
