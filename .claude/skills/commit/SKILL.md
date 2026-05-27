@@ -19,7 +19,8 @@ description: shari プロジェクト用に Conventional Commits（種別=英語
 
 - **type**（英語・小文字）: `feat` / `fix` / `docs` / `style` / `refactor` / `perf` / `test` / `chore` / `build` / `ci`
 - **scope**（このリポジトリの正規値）: `mobile` / `backend` / `api` / `shared` / `infra` / `repo`
-  - 2つ以上にまたがるときは `repo`（分割しない判断と矛盾しない）
+  - **同じ論点**が scope をまたぐ場合のみ `repo` に束ねる
+  - **論点が違う**なら scope を跨いでいても別コミットに分ける（後述の「分割の条件」参照）
 - **subject**: 日本語・命令形・50文字以内・末尾に句点を打たない
 - **body**: 1行空けて記述。**何をしたか**ではなく**なぜそれが必要か**を書く。改行幅は72文字目安
 
@@ -28,7 +29,7 @@ description: shari プロジェクト用に Conventional Commits（種別=英語
 以下を**全て**満たすなら、status → stage → commit の3手で終わらせる:
 
 - 変更が single type / single scope に収まる
-- 触ったファイルが 5 以下
+- 触ったファイルが 3 以下
 - シークレット系（`.env` / `.dev.vars` / `*.pem` / `*.key`）が含まれていない
 
 満たさないときだけ下の「通常手順」へ。
@@ -54,16 +55,33 @@ description: shari プロジェクト用に Conventional Commits（種別=英語
 - ❌ **type が違うだけ**を理由には分けない（同一要件で `feat` + `test` + `docs` がまとまっているのはむしろ望ましい）
 - ✅ シークレット隔離: 機微変更は独立コミット
 - ✅ revert 単位: 将来 cherry-pick / revert したい論点境界が明確なら分ける
+- ✅ **コンパイル可能性は維持**: 各コミット時点で `pnpm typecheck` がグリーンになるよう順序を組む
+
+### サイズの目安（再点検トリガ）
+
+- 1コミット **8 ファイル超**: 「これ本当に1論点か？」を立ち止まって再点検。複数論点の混在の可能性が高い
+- 1コミット **300 LOC 超** (生成物・lockfile 除く): 同上
+- 該当したら下の「典型分解パターン」を当ててみる
+
+### 典型分解パターン（同じ機能内でも別 revert 単位になりがちな境界）
+
+機能追加が「12 ファイル変更」になったら、以下の軸で割れないか確認する:
+
+1. **抽象化導入 vs 実装追加**: interface / 型契約を入れる commit と、その実装クラスを足す commit は分けられる
+2. **新規追加 vs 既存呼び出し点の差替**: 新サービスを足す commit と、既存の caller を新サービスに切り替える commit は別 revert 単位
+3. **不要コードの削除**: 移行に伴う旧コード削除は、移行と別にしておくと revert 時に「削除だけ取り消す」ができる
+4. **env / 型定義などスキャフォールド**: 新しい env を追加する commit と、それを使う実装 commit は分けても良い（ただし usage と離れすぎると意図が読みにくくなるので近接コミットに）
+5. **観測性 (logging / onError / metrics)**: feature とは別 revert 単位
 
 **束ねてよい例外（小変更のみ）:**
 
 以下を**全て**満たすときに限り、複数要件を1コミットに束ねてよい:
 
-- 変更ファイルが **合計 5 以下**
+- 変更ファイルが **合計 3 以下**
 - どの変更も独立して revert する必然性がない（typo 修正・lint 整形・小さなリネーム等）
 - いずれもシークレットを含まない
 
-**上限:** 1セッションで作る分割コミットは **5 まで**。超えるなら要件のまとめ方を再考し、関連が強いものを統合する（無理に `repo` で束ねるよりも、要件粒度を見直す）。
+**コミット数の上限はない。** 論点の数だけ分ける。1セッションで 7〜8 コミットになるのも普通。逆に **「コミット数を減らすために束ねる」のは禁止**。
 
 ## scope の判定
 
@@ -79,6 +97,8 @@ description: shari プロジェクト用に Conventional Commits（種別=英語
 
 ## 例
 
+### 単一コミットの良い例
+
 ```
 feat(backend): YouTube字幕取得エンドポイントを追加
 
@@ -86,12 +106,28 @@ videoId を受け取り Transcript API を呼ぶ tRPC procedure を実装。
 字幕なし動画は MVP 対象外なので 404 で返す方針。
 ```
 
+### 大きい変更の分割例（同一機能でも論点で割る）
+
+「字幕取得基盤を Supadata に乗せ換え + LLM 抽象化 + YouTube サービス縮小」のような複合変更は、
+論点ごとに分割する。同 PR にまとめて出すのは問題ないが、commit は別にする:
+
+```
+1. refactor(backend): tRPC サーバに onError ログを追加          (観測性)
+2. feat(backend): LlmClient interface を導入し Claude 実装を切り出す (抽象化導入)
+3. feat(backend): Supadata 経由の字幕取得 provider を追加         (新規実装)
+4. refactor(api): YouTube サービスを oEmbed メタ取得のみに縮小     (既存呼び出し点差替 + 旧コード削除)
+5. docs(repo): 字幕取得・LLM ロードマップを architecture.md に追記 (ドキュメント)
+```
+
+各コミット時点で `pnpm typecheck` がグリーンになるよう順序を組む（抽象化 → 実装 → caller 差替 の順が定石）。
+
 ## 避けるべき例
 
 - ❌ `update files`（type/scope/具体性すべて欠如）
 - ❌ `feat: 色々追加`（subject 抽象的）
 - ❌ `fix(mobile): bug fix`（中身ゼロ）
-- ❌ type が違うだけで mobile / backend を別コミットに分ける（scope 跨ぎは `repo` で束ねる）
+- ❌ **複数論点の束ね**: 「abstraction 導入 + 実装追加 + 旧コード削除」を 1 コミットにまとめる（revert 単位が混ざる）
+- ❌ **scope 跨ぎを理由にした安易な束ね**: 「backend と api に同時に触ったから repo で 1 つ」は短絡。論点が違うなら分ける
 
 ## 禁止
 
