@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import Markdown from "react-native-markdown-display";
+import { ERROR_CODE_DISPLAY, normalizeError, type ErrorCode } from "../lib/error";
 import { trpc } from "../lib/trpc";
 import type { RootStackParamList } from "../navigation/types";
 
@@ -50,6 +51,9 @@ export function ResultScreen({ route }: Props) {
     }
   }, [summarySuccess, videoId, fetchArticles]);
 
+  const summaryErrorCode = summaryMutation.error ? normalizeError(summaryMutation.error) : null;
+  const articlesErrorCode = articlesMutation.error ? normalizeError(articlesMutation.error) : null;
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -58,16 +62,18 @@ export function ResultScreen({ route }: Props) {
     >
       <SummarySection
         isPending={summaryMutation.isPending}
-        error={summaryMutation.error?.message ?? null}
+        errorCode={summaryErrorCode}
         summaryMd={summaryMutation.data?.summaryMd ?? null}
         cacheHit={summaryMutation.data?.cacheHit ?? null}
+        onRetry={() => createSummary({ videoId, language: "ja" })}
       />
 
       {summarySuccess && (
         <ArticlesSection
           isPending={articlesMutation.isPending}
-          error={articlesMutation.error?.message ?? null}
+          errorCode={articlesErrorCode}
           articles={articlesMutation.data?.articles ?? null}
+          onRetry={() => fetchArticles({ videoId })}
         />
       )}
     </ScrollView>
@@ -76,15 +82,22 @@ export function ResultScreen({ route }: Props) {
 
 function SummarySection(props: {
   isPending: boolean;
-  error: string | null;
+  errorCode: ErrorCode | null;
   summaryMd: string | null;
   cacheHit: boolean | null;
+  onRetry: () => void;
 }) {
-  if (props.error) {
+  if (props.errorCode) {
+    const display = ERROR_CODE_DISPLAY[props.errorCode];
     return (
       <View style={styles.errorBox}>
         <Text style={styles.errorTitle}>要約取得に失敗しました</Text>
-        <Text style={styles.errorMessage}>{props.error}</Text>
+        <Text style={styles.errorMessage}>{display.displayMessage}</Text>
+        {display.retryable && (
+          <Pressable style={styles.retryButton} onPress={props.onRetry} accessibilityRole="button">
+            <Text style={styles.retryButtonText}>もう一度試す</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -112,9 +125,12 @@ function SummarySection(props: {
 
 function ArticlesSection(props: {
   isPending: boolean;
-  error: string | null;
+  errorCode: ErrorCode | null;
   articles: readonly RelatedArticle[] | null;
+  onRetry: () => void;
 }) {
+  const errorDisplay = props.errorCode ? ERROR_CODE_DISPLAY[props.errorCode] : null;
+
   return (
     <View style={styles.articlesContainer}>
       <Text style={styles.sectionTitle}>関連記事</Text>
@@ -126,9 +142,20 @@ function ArticlesSection(props: {
         </View>
       )}
 
-      {props.error && (
+      {errorDisplay && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorMessage}>関連記事の取得に失敗: {props.error}</Text>
+          <Text style={styles.errorMessage}>
+            関連記事の取得に失敗: {errorDisplay.displayMessage}
+          </Text>
+          {errorDisplay.retryable && (
+            <Pressable
+              style={styles.retryButton}
+              onPress={props.onRetry}
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryButtonText}>もう一度試す</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -209,6 +236,19 @@ const styles = StyleSheet.create({
   errorMessage: {
     fontSize: 13,
     color: "#c00",
+  },
+  retryButton: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: "#c00",
+    borderRadius: 6,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
   },
   articlesContainer: {
     marginTop: 12,
