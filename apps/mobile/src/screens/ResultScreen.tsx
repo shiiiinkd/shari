@@ -1,7 +1,8 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RelatedArticle } from "@shari/shared";
-import { useEffect } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { useEffect, useState } from "react";
+import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { Skeleton } from "../components/Skeleton";
 import { ERROR_CODE_DISPLAY, normalizeError, type ErrorCode } from "../lib/error";
@@ -54,6 +55,7 @@ export function ResultScreen({ route }: Props) {
       keyboardShouldPersistTaps="handled"
     >
       <SummarySection
+        videoId={videoId}
         isPending={summaryMutation.isPending}
         errorCode={summaryErrorCode}
         summaryMd={summaryMutation.data?.summaryMd ?? null}
@@ -74,12 +76,15 @@ export function ResultScreen({ route }: Props) {
 }
 
 function SummarySection(props: {
+  videoId: string;
   isPending: boolean;
   errorCode: ErrorCode | null;
   summaryMd: string | null;
   cacheHit: boolean | null;
   onRetry: () => void;
 }) {
+  // コピー完了の表示を 2 秒だけ出すための一時 state。
+  const [copied, setCopied] = useState(false);
   if (props.errorCode) {
     const display = ERROR_CODE_DISPLAY[props.errorCode];
     return (
@@ -112,13 +117,48 @@ function SummarySection(props: {
     );
   }
 
+  const summaryMd = props.summaryMd;
+  const shareText = `${summaryMd}\n\n元動画: https://youtu.be/${props.videoId}`;
+
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(shareText);
+    setCopied(true);
+    // 一定時間後に「コピー」表示へ戻す。同じハンドラが連打されても
+    // 直近の timer で上書きされるだけなので clear 不要。
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    // ユーザーがシェアシートを閉じた場合や、Web Share API 非対応環境では
+    // reject される。UX 上致命的ではないので静かに無視する。
+    await Share.share({ message: shareText }).catch(() => undefined);
+  };
+
   return (
     <View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>要約</Text>
         {props.cacheHit && <Text style={styles.cacheBadge}>cache</Text>}
       </View>
-      <Markdown style={markdownStyles}>{props.summaryMd}</Markdown>
+      <Markdown style={markdownStyles}>{summaryMd}</Markdown>
+      <View style={styles.actionRow}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={handleCopy}
+          accessibilityRole="button"
+          accessibilityLabel="要約をコピー"
+        >
+          <Text style={styles.actionButtonText}>{copied ? "コピーしました" : "コピー"}</Text>
+        </Pressable>
+        <Pressable
+          style={styles.actionButton}
+          onPress={handleShare}
+          accessibilityRole="button"
+          accessibilityLabel="要約をシェア"
+        >
+          <Text style={styles.actionButtonText}>シェア</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -248,6 +288,24 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "600",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fafafa",
+  },
+  actionButtonText: {
+    fontSize: 13,
+    color: "#333",
+    fontWeight: "500",
   },
   articlesContainer: {
     marginTop: 12,
