@@ -217,7 +217,7 @@ function decodeEntities(s: string): string {
 export function sanitizeQiitaQuery(raw: string): string {
   // 全角/半角の括弧・記号系を空白に置換（Qiita 検索の予約文字含む）
   const replaced = raw
-    .replace(/[【】\[\]［］（）()｜|\/／#＃＠@:：,，、。.！!？?～~"'`「」『』〈〉《》〜]/g, " ")
+    .replace(/[【】[\]［］（）()｜|/／#＃＠@:：,，、。.！!？?～~"'`「」『』〈〉《》〜]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
