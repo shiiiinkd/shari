@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RelatedArticle } from "@shari/shared";
 import * as Clipboard from "expo-clipboard";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { Skeleton } from "../components/Skeleton";
@@ -85,6 +85,10 @@ function SummarySection(props: {
 }) {
   // コピー完了の表示を 2 秒だけ出すための一時 state。
   const [copied, setCopied] = useState(false);
+  // setTimeout は連打しても自動キャンセルされないため、ref に id を保持して
+  // 次タップ時に明示的に clear する。これがないと「2 連打→1 回目の timer が
+  // 早めに発火して、まだ 2 秒経っていない 2 回目の表示が消える」現象が起きる。
+  const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   if (props.errorCode) {
     const display = ERROR_CODE_DISPLAY[props.errorCode];
     return (
@@ -123,9 +127,13 @@ function SummarySection(props: {
   const handleCopy = async () => {
     await Clipboard.setStringAsync(shareText);
     setCopied(true);
-    // 一定時間後に「コピー」表示へ戻す。同じハンドラが連打されても
-    // 直近の timer で上書きされるだけなので clear 不要。
-    setTimeout(() => setCopied(false), 2000);
+    if (copyResetTimer.current !== null) {
+      clearTimeout(copyResetTimer.current);
+    }
+    copyResetTimer.current = setTimeout(() => {
+      setCopied(false);
+      copyResetTimer.current = null;
+    }, 2000);
   };
 
   const handleShare = async () => {
@@ -146,7 +154,7 @@ function SummarySection(props: {
           style={styles.actionButton}
           onPress={handleCopy}
           accessibilityRole="button"
-          accessibilityLabel="要約をコピー"
+          accessibilityLabel={copied ? "コピー完了" : "要約をコピー"}
         >
           <Text style={styles.actionButtonText}>{copied ? "コピーしました" : "コピー"}</Text>
         </Pressable>
