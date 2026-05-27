@@ -181,14 +181,28 @@ function extractMetaName(html: string, name: string): string | undefined {
   return m?.[1] ? decodeEntities(m[1]) : undefined;
 }
 
-/** HTML entity の最小デコード（&amp; &quot; &#39; &lt; &gt;）*/
+/**
+ * HTML entity の最小デコード。
+ * 名前付きは表示崩れに直結する頻出のみ対応、その他は数値参照（&#NNN; / &#xHHH;）で
+ * カバーする。完全な名前付きエンティティ表を持たないのは Workers バンドルサイズ抑制のため。
+ * &amp; は他デコードで再エンティティ化を避けるため最後に処理する。
+ */
 function decodeEntities(s: string): string {
   return s
-    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, n) => {
+      const code = Number(n);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : _;
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
+      const code = parseInt(h, 16);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : _;
+    })
+    .replace(/&amp;/g, "&");
 }
 
 /**
