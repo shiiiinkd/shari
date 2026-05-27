@@ -52,5 +52,20 @@ export default ts.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
+  {
+    // Metro の設定ファイルは Metro 側の制約で CommonJS (require / module.exports)
+    // 必須。Node ランタイムで実行される config なので CJS globals を許可する。
+    files: ["apps/mobile/metro.config.js"],
+    languageOptions: {
+      globals: {
+        require: "readonly",
+        module: "readonly",
+        __dirname: "readonly",
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
   prettier,
 );
