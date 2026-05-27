@@ -3,40 +3,23 @@ import { httpBatchLink } from "@trpc/client";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { RootNavigator } from "./src/navigation/RootNavigator";
 import { ensureSession, supabase } from "./src/lib/supabase";
 import { TRPC_URL, trpc } from "./src/lib/trpc";
 
 /**
- * tRPC + React Query を画面で疎通確認するだけの最小App。
- * MVP実装時に画面遷移・状態管理・UIを足していく。
+ * App 構造:
+ *   SafeAreaProvider
+ *     └ trpc.Provider
+ *         └ QueryClientProvider
+ *             └ RootNavigator (NavigationContainer + native-stack)
+ *
+ * 起動時に ensureSession() で匿名サインインを終わらせてから RootNavigator を描く。
+ * 認証成立前に Navigation を出すと、各 screen 内の protectedProcedure 呼び出しが
+ * UNAUTHORIZED で空振りするため、ガードはトップレベルに置く。
  */
-function HelloScreen() {
-  const { data, isLoading, error } = trpc.hello.useQuery({ name: "シャリ" });
-
-  if (isLoading) return <ActivityIndicator size="large" />;
-  if (error) {
-    return (
-      <View style={styles.errorBox}>
-        <Text style={styles.errorTitle}>接続失敗</Text>
-        <Text style={styles.errorMessage}>{error.message}</Text>
-        <Text style={styles.hint}>
-          backend (pnpm --filter @shari/backend dev) を起動していますか？
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.helloBox}>
-      <Text style={styles.title}>{data?.message}</Text>
-      <Text style={styles.timestamp}>{data?.timestamp}</Text>
-    </View>
-  );
-}
-
 export default function App() {
-  // セッション準備が終わるまで splash を見せる。
-  // ensureSession が走ると AsyncStorage 経由で永続化されるので、2回目以降は即解決する。
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -72,54 +55,46 @@ export default function App() {
 
   if (authError) {
     return (
-      <View style={styles.container}>
-        <View style={styles.errorBox}>
-          <Text style={styles.errorTitle}>セッション初期化失敗</Text>
-          <Text style={styles.errorMessage}>{authError}</Text>
+      <SafeAreaProvider>
+        <View style={styles.fallback}>
+          <View style={styles.errorBox}>
+            <Text style={styles.errorTitle}>セッション初期化失敗</Text>
+            <Text style={styles.errorMessage}>{authError}</Text>
+          </View>
         </View>
-      </View>
+      </SafeAreaProvider>
     );
   }
 
   if (!authReady) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.fallback}>
+          <ActivityIndicator size="large" />
+        </View>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <View style={styles.container}>
-          <HelloScreen />
+    <SafeAreaProvider>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <QueryClientProvider client={queryClient}>
+          <RootNavigator />
           <StatusBar style="auto" />
-        </View>
-      </QueryClientProvider>
-    </trpc.Provider>
+        </QueryClientProvider>
+      </trpc.Provider>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  fallback: {
     flex: 1,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-  },
-  helloBox: {
-    alignItems: "center",
-    gap: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  timestamp: {
-    fontSize: 12,
-    color: "#888",
   },
   errorBox: {
     alignItems: "center",
@@ -136,10 +111,5 @@ const styles = StyleSheet.create({
   errorMessage: {
     fontSize: 14,
     color: "#c00",
-  },
-  hint: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 8,
   },
 });

@@ -3,7 +3,7 @@
  * Context は backend 側（apps/backend）で生成されたものがここに渡る。
  * このパッケージは router の「型定義」を提供するだけで、ランタイム依存は最小に保つ。
  */
-import type { SummaryRequest, SummaryResult } from "@shari/shared";
+import type { SummaryRequest, SummaryResult, TranscriptOutput } from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError, initTRPC } from "@trpc/server";
 
@@ -28,13 +28,19 @@ export interface ContextEnv {
  * createContext から渡す。
  */
 export interface BackendServices {
-  /** YouTube 字幕 + 動画メタ + 言語指定 を受けて Claude に要約させる。 */
+  /** 字幕 + 動画メタ + 言語指定 を受けて LLM (Claude / 将来 Gemini) に要約させる。 */
   summarize: (request: SummaryRequest) => Promise<SummaryResult>;
   /**
-   * 現在の (prompt template + model) を表すバージョン文字列。
-   * summaries テーブルの cache key として使うため、Claude 呼び出し前に procedure 側で参照する。
+   * 現在の (LLM + prompt template) を表すバージョン文字列。
+   * summaries テーブルの cache key として使うため、LLM 呼び出し前に procedure 側で参照する。
+   * LLM 切替・プロンプト書き換えで値が変わり、自動的に再生成される。
    */
   currentPromptVersion: string;
+  /**
+   * videoId を受けて字幕を取得する。
+   * MVP は Supadata 経由。実装は apps/backend/src/services/transcript.ts。
+   */
+  fetchTranscript: (videoId: string) => Promise<TranscriptOutput>;
 }
 
 export type TRPCContext = {

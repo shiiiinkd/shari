@@ -163,7 +163,40 @@ shari/
 
 ## 8. 将来拡張ポイント
 
-### Phase 2 候補
+### 字幕取得・LLM ロードマップ
+
+**MVP (現状)**: Supadata Transcript API で字幕取得 → Claude API で要約。
+
+字幕取得は 2026 年に YouTube が PoT (Proof of Origin Token) を強制したため、Workers の fetch だけで字幕を引く経路 (Innertube / HTML scrape) は全滅した。当面は外部 SaaS に逃がす。
+
+LLM・Transcript provider は両方とも抽象化レイヤ越しに呼んでいる。差し替え箇所:
+
+- `apps/backend/src/clients/llm.ts` — `LlmClient` interface (`ClaudeClient` が現行実装)
+- `apps/backend/src/services/transcript.ts` — `TranscriptProvider` interface (`SupadataProvider` が現行実装)
+- 切替は env (`LLM_PROVIDER` / `TRANSCRIPT_PROVIDER`) で行う
+
+#### Phase 2: GeminiClient 実装 / Claude vs Gemini 切替可能化
+
+- `apps/backend/src/clients/llm.ts` に `GeminiClient` を追加
+- `LLM_PROVIDER=gemini` で起動時に Gemini に切り替わる
+- 価格・要約品質を AB 比較できる構造に
+- Gemini SDK か直 fetch (`generativelanguage.googleapis.com/v1beta/models/...`) のどちらでも可
+- 既存 summaries テーブルの `prompt_version` が自動的に変わるためキャッシュ汚染なし
+
+#### Phase 3: Gemini 動画直接処理への移行検討
+
+- Gemini API は YouTube URL を直接渡せる ([公式ドキュメント](https://ai.google.dev/gemini-api/docs/vision))
+- これが実用速度・品質に達した時点で、字幕取得自体を bypass する選択肢が出てくる
+- メリット: Supadata 依存解消、字幕無し動画対応、映像情報 (スライド・コード・図表) も活用可
+- 検討トリガ: ① Gemini Video の応答速度が 10 分動画あたり 30 秒以内 ② 要約品質が現状の「字幕→要約」を上回る
+- 移行する場合は `LlmClient` の契約自体を変更する必要あり (今は `transcriptText: string` 前提)
+
+#### Transcript provider 追加候補 (字幕経路の冗長化 / コスト最適化)
+
+- **self-host**: Fly.io / Railway に Node サーバを立て youtubei.js を動かす。Workers → fetch で叩く。Supadata 月額より安くなる規模になったタイミングで検討
+- **Whisper fallback**: Supadata / self-host が NOT_FOUND を返した動画 (字幕無し) を Whisper で文字起こし。動画ダウンロードが必要なので Workers 単独では不可、self-host 前提
+
+### Phase 2 その他候補
 
 - 図解生成 / 英語学習モード / Notion・Obsidian 連携 / LINE 共有
 - チャンネル定期要約（cron + Workers Queue）

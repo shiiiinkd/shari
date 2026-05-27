@@ -1,0 +1,156 @@
+import { useFocusEffect } from "@react-navigation/native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { youtubeUrlSchema } from "@shari/shared";
+import * as Clipboard from "expo-clipboard";
+import { useCallback, useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import type { RootStackParamList } from "../navigation/types";
+
+type Props = NativeStackScreenProps<RootStackParamList, "Home">;
+
+/**
+ * Home: YouTube URL を受け取り videoId 化 → Result へ遷移。
+ *
+ * クリップボード方針 (MVP):
+ *   - 起動時 / 画面復帰時に Clipboard.hasUrlAsync() で URL 検出のみ行い、
+ *     入っていれば「貼り付け」ボタンを表示する。
+ *   - hasUrlAsync は中身を読まないため iOS の paste 通知を出さない。
+ *   - 実際の貼り付けはユーザーがボタンを押した時に getStringAsync で行う。
+ *   - 自動貼り付け / 設定 ON-OFF は Phase2 で扱う。
+ */
+export function HomeScreen({ navigation }: Props) {
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [hasClipboardUrl, setHasClipboardUrl] = useState(false);
+
+  // useFocusEffect: Home が再度アクティブになるたび評価し直す。
+  // Result から戻ってきた時にもクリップボードに新しい URL が入っていれば反映できる。
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      Clipboard.hasUrlAsync()
+        .then((hit) => {
+          if (!cancelled) setHasClipboardUrl(hit);
+        })
+        .catch(() => {
+          if (!cancelled) setHasClipboardUrl(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
+
+  const handlePaste = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (text) {
+        setUrl(text.trim());
+        setError(null);
+      }
+    } catch {
+      // 貼り付け失敗 → 手入力で続行できるので静かに無視
+    }
+  };
+
+  const handleSubmit = () => {
+    setError(null);
+    const result = youtubeUrlSchema.safeParse(url.trim());
+    if (!result.success) {
+      setError("正しい YouTube URL を入力してください");
+      return;
+    }
+    navigation.navigate("Result", { videoId: result.data });
+  };
+
+  const canSubmit = url.trim().length > 0;
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.label}>YouTube URL を入力</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="https://www.youtube.com/watch?v=..."
+        value={url}
+        onChangeText={(v) => {
+          setUrl(v);
+          if (error) setError(null);
+        }}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="url"
+        returnKeyType="go"
+        onSubmitEditing={handleSubmit}
+      />
+
+      {hasClipboardUrl && (
+        <Pressable style={styles.pasteBtn} onPress={handlePaste}>
+          <Text style={styles.pasteBtnText}>クリップボードから貼り付け</Text>
+        </Pressable>
+      )}
+
+      <Pressable
+        style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
+        onPress={handleSubmit}
+        disabled={!canSubmit}
+      >
+        <Text style={styles.submitBtnText}>要約する</Text>
+      </Pressable>
+
+      {error && <Text style={styles.error}>{error}</Text>}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 24,
+    gap: 12,
+    backgroundColor: "#fff",
+  },
+  label: {
+    fontSize: 14,
+    color: "#333",
+    marginTop: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: "#fff",
+  },
+  pasteBtn: {
+    alignSelf: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: "#eef",
+  },
+  pasteBtnText: {
+    fontSize: 14,
+    color: "#225",
+  },
+  submitBtn: {
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: "#0a7",
+    alignItems: "center",
+  },
+  submitBtnDisabled: {
+    backgroundColor: "#aaa",
+  },
+  submitBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  error: {
+    color: "#c00",
+    fontSize: 14,
+  },
+});

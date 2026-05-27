@@ -189,6 +189,9 @@ Stripe 等の課金連携を入れたときに紐づける器。
 - [ ] 要約の再生成 API を出すか、TTL 経過で自動再生成か
 - [ ] `related_articles` のリフレッシュ間隔（7日仮置き）
 - [ ] チャンネル単位の購読機能を入れた時の `channel_subscriptions` テーブル（Phase 2）
+- [ ] Zenn 検索の代替手段（RSS / topic feed）— **Phase 2 送り**。Qiita
+      単独で質・量が不足すると判断したタイミングで着手する。実装候補は
+      `packages/api/src/services/articles.ts` の `searchZenn` コメント参照
 
 ---
 

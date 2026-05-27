@@ -8,8 +8,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "../worker-configuration.js";
-import { buildPromptVersion, summarizeTranscript } from "./clients/claude.js";
+import { createLlmClient } from "./clients/llm.js";
 import { buildCorsOrigin, parseEnv } from "./env.js";
+import { createTranscriptProvider } from "./services/transcript.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -33,6 +34,20 @@ app.use(
   "/trpc/*",
   trpcServer({
     router: appRouter,
+    onError: ({ error, path, type }) => {
+      // 全 env で常時稼働する。Workers の console.error は Cloudflare ダッシュボード /
+      // wrangler tail で参照する内部ログに流れるだけで、HTTP レスポンスには出ない
+      // (クライアントが見るのは TRPCError.message のみ) ため、本番でも詳細を残す方が
+      // 障害切り分けに有利。Sentry 等に集約したくなった時点でここを差し替える。
+      console.error("[trpc] error", {
+        path,
+        type,
+        code: error.code,
+        message: error.message,
+        cause: error.cause instanceof Error ? error.cause.message : error.cause,
+        stack: error.stack?.split("\n").slice(0, 8).join("\n"),
+      });
+    },
     createContext: async (_opts, c): Promise<TRPCContext> => {
       const env = parseEnv(c.env);
 
@@ -58,12 +73,16 @@ app.use(
         }
       }
 
-      // 外部サービスを context に注入。重い SDK を直接 packages/api に持ち込まないため、
-      // backend 側で env を bind した薄いクロージャだけを渡す。
+      // 外部サービスを context に注入。重い SDK / 切替可能 provider を直接 packages/api に
+      // 持ち込まないため、backend 側で env を bind したクロージャだけを渡す。
+      // LLM (Claude / Gemini) と Transcript provider (Supadata / 将来候補) はそれぞれ
+      // factory で env から選んでいる。
+      const llm = createLlmClient(env);
+      const transcript = createTranscriptProvider(env);
       const services = {
-        summarize: (request: Parameters<typeof summarizeTranscript>[1]) =>
-          summarizeTranscript(env, request),
-        currentPromptVersion: buildPromptVersion(),
+        summarize: (request: Parameters<typeof llm.summarize>[0]) => llm.summarize(request),
+        currentPromptVersion: llm.promptVersion,
+        fetchTranscript: (videoId: string) => transcript.fetch(videoId),
       };
 
       return { env, supabase, user, services };
