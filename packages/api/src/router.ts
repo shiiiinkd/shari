@@ -22,7 +22,7 @@ export const appRouter = router({
   /** YouTube 関連（字幕取得・将来的にメタデータ取得など）。 */
   youtube: youtubeRouter,
 
-  /** 要約 procedure（Claude API 経由）。 */
+  /** 要約 procedure（Claude / 将来 Gemini への切替可能）。 */
   summary: summaryRouter,
 
   /** 関連技術記事（Qiita / Zenn）取得 procedure。 */

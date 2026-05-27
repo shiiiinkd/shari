@@ -28,11 +28,12 @@ export interface ContextEnv {
  * createContext から渡す。
  */
 export interface BackendServices {
-  /** YouTube 字幕 + 動画メタ + 言語指定 を受けて Claude に要約させる。 */
+  /** 字幕 + 動画メタ + 言語指定 を受けて LLM (Claude / 将来 Gemini) に要約させる。 */
   summarize: (request: SummaryRequest) => Promise<SummaryResult>;
   /**
-   * 現在の (prompt template + model) を表すバージョン文字列。
-   * summaries テーブルの cache key として使うため、Claude 呼び出し前に procedure 側で参照する。
+   * 現在の (LLM + prompt template) を表すバージョン文字列。
+   * summaries テーブルの cache key として使うため、LLM 呼び出し前に procedure 側で参照する。
+   * LLM 切替・プロンプト書き換えで値が変わり、自動的に再生成される。
    */
   currentPromptVersion: string;
 }

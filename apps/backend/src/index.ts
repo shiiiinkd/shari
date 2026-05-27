@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "../worker-configuration.js";
-import { buildPromptVersion, summarizeTranscript } from "./clients/claude.js";
+import { createLlmClient } from "./clients/llm.js";
 import { buildCorsOrigin, parseEnv } from "./env.js";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -69,12 +69,13 @@ app.use(
         }
       }
 
-      // 外部サービスを context に注入。重い SDK を直接 packages/api に持ち込まないため、
-      // backend 側で env を bind した薄いクロージャだけを渡す。
+      // 外部サービスを context に注入。重い SDK / 切替可能 provider を直接 packages/api に
+      // 持ち込まないため、backend 側で env を bind したクロージャだけを渡す。
+      // LLM (Claude / Gemini) は factory で env から選んでいる。
+      const llm = createLlmClient(env);
       const services = {
-        summarize: (request: Parameters<typeof summarizeTranscript>[1]) =>
-          summarizeTranscript(env, request),
-        currentPromptVersion: buildPromptVersion(),
+        summarize: (request: Parameters<typeof llm.summarize>[0]) => llm.summarize(request),
+        currentPromptVersion: llm.promptVersion,
       };
 
       return { env, supabase, user, services };

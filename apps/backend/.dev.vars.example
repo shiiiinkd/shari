@@ -6,6 +6,11 @@
 # --- Anthropic Claude API ---
 ANTHROPIC_API_KEY=
 
+# --- LLM provider 切替 ---
+# 未指定 / "claude" → Claude API を使う (MVP デフォルト)
+# "gemini" → Phase 2 で追加予定。現状は throw する
+# LLM_PROVIDER=claude
+
 # --- Supabase ---
 SUPABASE_URL=
 SUPABASE_ANON_KEY=

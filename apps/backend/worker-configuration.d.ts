@@ -10,6 +10,8 @@
 export interface Env {
   // --- AI ---
   ANTHROPIC_API_KEY: string;
+  /** "claude" / "gemini"。未設定は claude。Phase 2 で Gemini を追加予定。 */
+  LLM_PROVIDER?: string;
 
   // --- Supabase ---
   SUPABASE_URL: string;

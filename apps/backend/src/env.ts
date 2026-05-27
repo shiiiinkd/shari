@@ -11,6 +11,8 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
   QIITA_TOKEN: z.string().optional(),
+  /** "claude" / "gemini"。未設定は claude。 */
+  LLM_PROVIDER: z.string().optional(),
   ALLOWED_ORIGIN: z.string().min(1).default("*"),
 });
 
