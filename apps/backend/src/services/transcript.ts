@@ -12,7 +12,15 @@
  *     - "self-host" (将来): 自前 Node.js プロキシ (Fly.io / Railway) + youtubei.js
  *     - "whisper"   (将来): 動画 audio 抽出 + Whisper fallback
  */
-import type { TranscriptOutput, TranscriptSegment } from "@shari/shared";
+import {
+  SUPADATA_RATE_LIMITED_SLUG,
+  SUPADATA_UNEXPECTED_SHAPE_SLUG,
+  SUPADATA_UNEXPECTED_STATUS_SLUG,
+  TRANSCRIPT_SERVICE_UNAVAILABLE_SLUG,
+  TRANSCRIPT_UNAVAILABLE_SLUG,
+  type TranscriptOutput,
+  type TranscriptSegment,
+} from "@shari/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -64,7 +72,7 @@ class SupadataProvider implements TranscriptProvider {
     if (res.status === 404) {
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "transcript_unavailable: 動画に字幕がありません",
+        message: `${TRANSCRIPT_UNAVAILABLE_SLUG}: 動画に字幕がありません`,
       });
     }
     if (res.status === 401 || res.status === 403) {
@@ -73,19 +81,19 @@ class SupadataProvider implements TranscriptProvider {
       console.error("supadata_auth_failed", { status: res.status });
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
-        message: "transcript_service_unavailable",
+        message: TRANSCRIPT_SERVICE_UNAVAILABLE_SLUG,
       });
     }
     if (res.status === 429) {
       throw new TRPCError({
         code: "TOO_MANY_REQUESTS",
-        message: "supadata_rate_limited",
+        message: SUPADATA_RATE_LIMITED_SLUG,
       });
     }
     if (!res.ok) {
       throw new TRPCError({
         code: "BAD_GATEWAY",
-        message: `supadata_unexpected_status: ${res.status}`,
+        message: `${SUPADATA_UNEXPECTED_STATUS_SLUG}: ${res.status}`,
       });
     }
 
@@ -94,7 +102,7 @@ class SupadataProvider implements TranscriptProvider {
     if (!parsed.success) {
       throw new TRPCError({
         code: "BAD_GATEWAY",
-        message: "supadata_unexpected_shape",
+        message: SUPADATA_UNEXPECTED_SHAPE_SLUG,
       });
     }
 
@@ -109,7 +117,7 @@ class SupadataProvider implements TranscriptProvider {
     if (segments.length === 0) {
       throw new TRPCError({
         code: "NOT_FOUND",
-        message: "transcript_unavailable: 字幕が空でした",
+        message: `${TRANSCRIPT_UNAVAILABLE_SLUG}: 字幕が空でした`,
       });
     }
 
