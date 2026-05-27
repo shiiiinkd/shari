@@ -35,7 +35,10 @@ app.use(
   trpcServer({
     router: appRouter,
     onError: ({ error, path, type }) => {
-      // dev 中の原因特定のため詳細を stderr に出す。production では sentry 等に差し替え。
+      // 全 env で常時稼働する。Workers の console.error は Cloudflare ダッシュボード /
+      // wrangler tail で参照する内部ログに流れるだけで、HTTP レスポンスには出ない
+      // (クライアントが見るのは TRPCError.message のみ) ため、本番でも詳細を残す方が
+      // 障害切り分けに有利。Sentry 等に集約したくなった時点でここを差し替える。
       console.error("[trpc] error", {
         path,
         type,
