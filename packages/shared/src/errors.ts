@@ -29,6 +29,7 @@ export const SUPADATA_UNEXPECTED_SHAPE_SLUG = "supadata_unexpected_shape";
 export const TRANSCRIPT_SERVICE_UNAVAILABLE_SLUG = "transcript_service_unavailable";
 export const YOUTUBE_OEMBED_FAILED_SLUG = "youtube_oembed_failed";
 export const YOUTUBE_OEMBED_UNEXPECTED_SHAPE_SLUG = "youtube_oembed_unexpected_shape";
+export const LLM_OVERLOADED_SLUG = "llm_overloaded";
 
 interface ErrorCodeDisplay {
   /** ユーザーに見せる日本語メッセージ。 */
