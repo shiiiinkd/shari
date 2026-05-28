@@ -22,6 +22,9 @@ const QIITA_PER_PAGE = 6;
 const QIITA_QUERY_MAX_LENGTH = 80;
 // 1 サイト遅延が全体レスポンスを引きずらないよう短めに。失敗しても画像なしで描画継続できる。
 const OGP_FETCH_TIMEOUT_MS = 2000;
+// 関連記事の最大表示件数。Slack 風プレビュー（画像つき）はスクロール量が大きく、
+// 上位 3 件で関連度の高い記事をしっかり見せる方針。OGP fetch の並列数 = 3 にもなる。
+const MAX_ARTICLES_RETURNED = 3;
 
 const qiitaItemSchema = z.object({
   url: z.string().url(),
@@ -122,6 +125,28 @@ export async function enrichWithOgp(articles: RelatedArticle[]): Promise<Related
       };
     }),
   );
+}
+
+/**
+ * Qiita / Zenn 並列検索 → スコアソート → 上位 N 件 → OGP enrich までを一括で行う。
+ * router 側のコア副作用（外部 API fetch）をすべてここに集約し、
+ * packages/api には型シェアのみ残す方針（docs/architecture.md §9）。
+ */
+export async function fetchRelatedArticles(
+  title: string,
+  options: { qiitaToken?: string } = {},
+): Promise<RelatedArticle[]> {
+  const [qiitaResults, zennResults] = await Promise.all([
+    searchQiita(title, { token: options.qiitaToken }),
+    searchZenn(title),
+  ]);
+
+  const merged = [...qiitaResults, ...zennResults]
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, MAX_ARTICLES_RETURNED);
+
+  if (merged.length === 0) return [];
+  return enrichWithOgp(merged);
 }
 
 type OgpData = {
