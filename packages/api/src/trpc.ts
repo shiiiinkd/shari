@@ -3,7 +3,12 @@
  * Context は backend 側（apps/backend）で生成されたものがここに渡る。
  * このパッケージは router の「型定義」を提供するだけで、ランタイム依存は最小に保つ。
  */
-import type { RelatedArticle, SummaryRequest, SummaryResult, TranscriptOutput } from "@shari/shared";
+import type {
+  RelatedArticle,
+  SummaryRequest,
+  SummaryResult,
+  TranscriptOutput,
+} from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError, initTRPC } from "@trpc/server";
 
