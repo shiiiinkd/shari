@@ -12,72 +12,85 @@ mobile から backend（Cloudflare Workers のローカル: `wrangler dev`）に
 
 ## TL;DR
 
-```bash
-# ターミナル1
-pnpm --filter @shari/backend dev    # → http://localhost:8787
+URL は `src/lib/trpc.ts` の `resolveTrpcUrl` が**自動解決**する。同一 WiFi なら手で切替不要。
 
-# ターミナル2
-pnpm --filter @shari/mobile dev     # → expo start
+```bash
+# 実機(Expo Go / iOS)で確認 — backend を LAN 公開(--ip 0.0.0.0)で起動
+pnpm dev        # backend(0.0.0.0) + expo start。スマホで QR を読む → LAN IP 自動導出
+
+# Web で確認 — backend は localhost
+pnpm dev:web    # backend(localhost) + expo start --web
 ```
 
-その上で `apps/mobile/src/lib/trpc.ts` の `TRPC_URL` を **実行環境に応じて** 切り替える（下表参照）。
+- `pnpm dev` = 実機 Expo Go 用（Mac とスマホが**同一 WiFi**のとき）
+- `pnpm dev:web` = Web 用
+- 出先（スマホが別ネットワーク）は下の「出先：トンネル接続」を参照。
 
-## URL 早見表
+## URL 早見表（resolveTrpcUrl が自動で選ぶ値）
 
-| 実行環境                      | TRPC_URL に入れる値                                                          |
-| ----------------------------- | ---------------------------------------------------------------------------- |
-| iOS Simulator                 | `http://localhost:8787/trpc`                                                 |
-| Android Emulator（標準 AVD）  | `http://10.0.2.2:8787/trpc`（エミュからホストの loopback）                   |
-| iOS / Android 実機（同一LAN） | `http://<開発機のLAN IP>:8787/trpc`（例: `http://192.168.1.42:8787/trpc`）   |
-| Expo Go（Tunnel モード）      | 同上（LAN IP を使う）。Tunnel は HTTPS だが backend は HTTP なので推奨しない |
+手動設定は基本不要。`EXPO_PUBLIC_TRPC_URL` を設定したときだけ上書きされる。
 
-**LAN IP の確認**:
+| 実行環境                      | 解決される値                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| Web                           | `http://localhost:8787/trpc`                                                              |
+| iOS / Android 実機（同一LAN） | `http://<hostUri の LAN IP>:8787/trpc`（自動導出。`pnpm dev` で backend を 0.0.0.0 起動） |
+| iOS Simulator                 | hostUri から導出、取れなければ `http://localhost:8787/trpc`                               |
+| Android Emulator（標準 AVD）  | 必要なら `EXPO_PUBLIC_TRPC_URL=http://10.0.2.2:8787/trpc` で上書き                        |
+| 出先（別ネットワーク）        | トンネル必須 → 下記「出先：トンネル接続」                                                 |
+
+**LAN IP の確認**（デバッグ時）:
 
 ```bash
 ipconfig getifaddr en0    # macOS Wi-Fi
 # → 192.168.x.x
 ```
 
-## 推奨: ハードコードを排除する
+## URL 解決ロジック（実装済み）
 
-現状 `apps/mobile/src/lib/trpc.ts:21` で URL がハードコードされている（コメントで「MVP前に整理」とTODO）。
-最終的には以下の形に持っていく:
+`apps/mobile/src/lib/trpc.ts` の `resolveTrpcUrl()` が実行環境から自動で URL を決める（ハードコードは廃止済み）:
 
-### `apps/mobile/app.config.ts`（`app.json` を差し替え）
+1. `EXPO_PUBLIC_TRPC_URL`（`.env` → `app.config.ts` の `extra.trpcUrl`）が**明示されていれば最優先** … 出先トンネル・本番用
+2. **Web** → `http://localhost:8787/trpc`（SSH ポートフォワードで到達）
+3. **実機 / Simulator** → Metro 接続ホスト（`Constants.expoConfig.hostUri` ／ なければ `expoGoConfig.debuggerHost`）から LAN IP を取り出し `:8787` に接続
 
-```ts
-import type { ExpoConfig } from "expo/config";
+→ Mac とスマホが**同一 WiFi**なら `.env` を触らず実機で繋がる。
 
-const trpcUrl = process.env.EXPO_PUBLIC_TRPC_URL ?? "http://localhost:8787/trpc";
+**重要1（backend のバインド）**: 実機が LAN IP で backend に届くには全インターフェースで listen させる必要がある。
+`pnpm dev`（backend）は `wrangler dev --port 8787 --ip 0.0.0.0` で起動する（`dev:web` は localhost のまま）。
+`--ip 0.0.0.0` は dev backend を LAN に晒すので、公衆 WiFi では注意（その場合は `dev:web` か Web で確認）。
 
-const config: ExpoConfig = {
-  name: "mobile",
-  slug: "mobile",
-  // ...既存の app.json の中身...
-  extra: {
-    trpcUrl,
-  },
-};
+**重要2（hostUri が `127.0.0.1` になる問題）**: 開発機が複数 NIC（en0/en1 + Tailscale 等の `utun` 100.x）を持つと、
+`expo start` / `--host lan` は LAN IP を選べず hostUri を `127.0.0.1` で出し、実機が backend に届かない。
+→ `pnpm dev`（mobile）は `apps/mobile/scripts/start-lan.mjs` 経由で起動し、LAN IPv4（`192.168.x` 優先・loopback/Tailscale 除外）を
+自動検出して `REACT_NATIVE_PACKAGER_HOSTNAME` に渡す。Web（`dev:web`）はこのラッパーを通さないので影響しない。
 
-export default config;
+**デバッグ**: 実機を使わずに Metro が実際に出す hostUri を確認できる:
+
+```bash
+curl -s -H "expo-platform: ios" -H "expo-protocol-version: 1" \
+  -H "Accept: multipart/mixed, application/expo+json, application/json" \
+  http://localhost:8081/ | tr ',' '\n' | grep -iE "hostUri|debuggerHost"
 ```
 
-### `apps/mobile/.env.local`（git管理外）
+## 出先：トンネル接続（スマホが Mac と別ネットワークのとき）
 
+LAN IP は届かないので Metro と backend を**両方**公開する:
+
+```bash
+# 1. backend を公開（無料の即席トンネル。HTTPS URL が出る）
+cloudflared tunnel --url http://localhost:8787
+#   → https://xxxx.trycloudflare.com を控える
+
+# 2. その URL を override に設定（末尾に /trpc）
+echo 'EXPO_PUBLIC_TRPC_URL=https://xxxx.trycloudflare.com/trpc' >> apps/mobile/.env
+
+# 3. Metro をトンネルモードで起動
+pnpm --filter @shari/mobile exec expo start --tunnel
 ```
-EXPO_PUBLIC_TRPC_URL=http://10.0.2.2:8787/trpc
-```
 
-### `apps/mobile/src/lib/trpc.ts` を更新
-
-```ts
-import Constants from "expo-constants";
-
-export const TRPC_URL =
-  (Constants.expoConfig?.extra?.trpcUrl as string | undefined) ?? "http://localhost:8787/trpc";
-```
-
-これで `EXPO_PUBLIC_TRPC_URL` を環境ごとに切り替えれば、コードを触らず URL を変更できる。
+- 即席トンネルの URL は**起動ごとに変わる** → 毎回 `.env` 更新 + expo 再起動が要る。固定したいなら named tunnel / 独自ドメイン or ngrok の予約ドメイン。
+- ネイティブ fetch は CORS 非適用なので backend CORS はそのままで可。トンネルは HTTPS なので iOS ATS も問題なし。
+- 手軽さ優先なら出先は `pnpm dev:web`（Web）が確実。
 
 ## CORS
 
@@ -96,14 +109,15 @@ app.use(
 
 ## よくあるエラーと対処
 
-| 症状                                                     | 原因                                                 | 対処                                                                                                                  |
-| -------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `Network request failed`（Android Emu）                  | `localhost` をエミュ内 loopback として解釈している   | URL を `10.0.2.2` に変更                                                                                              |
-| `Network request failed`（実機）                         | 開発機の LAN IP が変わった or 別Wi-Fi に繋がっている | `ipconfig getifaddr en0` で再確認、両端末を同じWi-Fiに                                                                |
-| iOS で `App Transport Security blocks ... http://`       | iOS が HTTP を拒否（本番ビルド時）                   | dev中は `app.json` の `ios.infoPlist.NSAppTransportSecurity.NSAllowsLocalNetworking = true` を許容、本番は HTTPS 必須 |
-| `Failed to compile`（型エラー）                          | `@shari/api` の Router 型が更新されていない          | `pnpm install`、それでもダメなら `pnpm clean && pnpm install`                                                         |
-| `Metro bundler cache が壊れた`                           | watchman / metro のキャッシュ                        | `pnpm --filter @shari/mobile exec expo start -c`                                                                      |
-| `pnpm dev` で両方起動したいのに backend が立ち上がらない | turbo の `dev` タスクが persistent で順序保証なし    | ターミナル2枚で個別 `pnpm --filter` 起動を推奨                                                                        |
+| 症状                                                     | 原因                                                                    | 対処                                                                                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Network request failed`（Android Emu）                  | `localhost` をエミュ内 loopback として解釈している                      | URL を `10.0.2.2` に変更                                                                                                                           |
+| `Network request failed`（実機）                         | 開発機の LAN IP が変わった or 別Wi-Fi に繋がっている                    | `ipconfig getifaddr en0` で再確認、両端末を同じWi-Fiに                                                                                             |
+| 実機で即「通信エラー」/ 接続先が `127.0.0.1`             | 複数 NIC(Tailscale 等)で expo が LAN IP を選べず hostUri が `127.0.0.1` | `pnpm dev` で起動（`start-lan.mjs` が `REACT_NATIVE_PACKAGER_HOSTNAME` を自動設定）。手動なら `REACT_NATIVE_PACKAGER_HOSTNAME=<LAN IP> expo start` |
+| iOS で `App Transport Security blocks ... http://`       | iOS が HTTP を拒否（本番ビルド時）                                      | dev中は `app.json` の `ios.infoPlist.NSAppTransportSecurity.NSAllowsLocalNetworking = true` を許容、本番は HTTPS 必須                              |
+| `Failed to compile`（型エラー）                          | `@shari/api` の Router 型が更新されていない                             | `pnpm install`、それでもダメなら `pnpm clean && pnpm install`                                                                                      |
+| `Metro bundler cache が壊れた`                           | watchman / metro のキャッシュ                                           | `pnpm --filter @shari/mobile exec expo start -c`                                                                                                   |
+| `pnpm dev` で両方起動したいのに backend が立ち上がらない | turbo の `dev` タスクが persistent で順序保証なし                       | ターミナル2枚で個別 `pnpm --filter` 起動を推奨                                                                                                     |
 
 ## チェックリスト（接続詰まったとき）
 
