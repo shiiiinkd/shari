@@ -30,12 +30,7 @@
 import { articlesRelatedForInputSchema, articlesRelatedForOutputSchema } from "@shari/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { enrichWithOgp, searchQiita, searchZenn } from "../services/articles.js";
 import { protectedProcedure, router } from "../trpc.js";
-
-// 関連記事の最大表示件数。Slack 風プレビュー（画像つき）はスクロール量が大きく、
-// 上位 3 件で関連度の高い記事をしっかり見せる方針。OGP fetch の並列数 = 3 にもなる。
-const MAX_ARTICLES_RETURNED = 3;
 
 const videoTitleRowSchema = z.object({
   title: z.string().min(1),
@@ -74,23 +69,11 @@ export const articlesRouter = router({
 
       const { title } = videoTitleRowSchema.parse(videoRow.data);
 
-      // 2. Qiita / Zenn 並列検索（Workers サブリクエスト消費 = 最大 2）
-      const [qiitaResults, zennResults] = await Promise.all([
-        searchQiita(title, { token: ctx.env.QIITA_TOKEN }),
-        searchZenn(title),
-      ]);
+      // 2. 関連記事取得（Qiita 検索・スコアソート・OGP enrich を backend service に委譲）
+      const articles = await ctx.services.fetchRelatedArticles(title, {
+        qiitaToken: ctx.env.QIITA_TOKEN,
+      });
 
-      const merged = [...qiitaResults, ...zennResults]
-        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-        .slice(0, MAX_ARTICLES_RETURNED);
-
-      if (merged.length === 0) {
-        return { articles: [] };
-      }
-
-      // 3. OGP メタ取得（並列・各 fetch にタイムアウト）
-      const enriched = await enrichWithOgp(merged);
-
-      return { articles: enriched };
+      return { articles };
     }),
 });

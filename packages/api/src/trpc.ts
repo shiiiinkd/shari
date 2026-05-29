@@ -3,7 +3,12 @@
  * Context は backend 側（apps/backend）で生成されたものがここに渡る。
  * このパッケージは router の「型定義」を提供するだけで、ランタイム依存は最小に保つ。
  */
-import type { SummaryRequest, SummaryResult, TranscriptOutput } from "@shari/shared";
+import type {
+  RelatedArticle,
+  SummaryRequest,
+  SummaryResult,
+  TranscriptOutput,
+} from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError, initTRPC } from "@trpc/server";
 
@@ -41,6 +46,24 @@ export interface BackendServices {
    * MVP は Supadata 経由。実装は apps/backend/src/services/transcript.ts。
    */
   fetchTranscript: (videoId: string) => Promise<TranscriptOutput>;
+  /**
+   * videoId から動画メタデータ（タイトル・チャンネル名）を取得する。
+   * YouTube oEmbed 経由。実装は apps/backend/src/services/youtube.ts。
+   */
+  fetchYoutubeMetadata: (videoId: string) => Promise<{
+    videoTitle: string;
+    channelName: string;
+    channelId?: string;
+    durationSec?: number;
+  }>;
+  /**
+   * タイトルから関連記事を検索・スコアソート・OGP enrich して返す。
+   * 実装は apps/backend/src/services/articles.ts。
+   */
+  fetchRelatedArticles: (
+    title: string,
+    options: { qiitaToken?: string },
+  ) => Promise<RelatedArticle[]>;
 }
 
 export type TRPCContext = {

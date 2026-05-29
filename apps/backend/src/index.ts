@@ -10,7 +10,9 @@ import { cors } from "hono/cors";
 import type { Env } from "../worker-configuration.js";
 import { createLlmClient } from "./clients/llm.js";
 import { buildCorsOrigin, parseEnv } from "./env.js";
+import { fetchRelatedArticles } from "./services/articles.js";
 import { createTranscriptProvider } from "./services/transcript.js";
+import { fetchYoutubeMetadata } from "./services/youtube.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -83,6 +85,9 @@ app.use(
         summarize: (request: Parameters<typeof llm.summarize>[0]) => llm.summarize(request),
         currentPromptVersion: llm.promptVersion,
         fetchTranscript: (videoId: string) => transcript.fetch(videoId),
+        fetchYoutubeMetadata: (videoId: string) => fetchYoutubeMetadata(videoId),
+        fetchRelatedArticles: (title: string, options: { qiitaToken?: string }) =>
+          fetchRelatedArticles(title, options),
       };
 
       return { env, supabase, user, services };

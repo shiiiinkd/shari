@@ -25,7 +25,6 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { fetchYoutubeMetadata } from "../services/youtube.js";
 import { protectedProcedure, router } from "../trpc.js";
 
 const cachedSummarySchema = z.object({
@@ -130,7 +129,7 @@ export const summaryRouter = router({
         // メタと字幕は別 source。oEmbed と Supadata は独立に叩けるので並列化する。
         // どちらかが失敗したら mutation 全体を fail させたい (Promise.all で揃える)。
         const [meta, transcript] = await Promise.all([
-          fetchYoutubeMetadata(videoId),
+          ctx.services.fetchYoutubeMetadata(videoId),
           ctx.services.fetchTranscript(videoId),
         ]);
         videoTitle = meta.videoTitle;
