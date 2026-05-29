@@ -4,7 +4,7 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "dev": "expo start",
+    "dev": "node scripts/start-lan.mjs",
     "dev:web": "expo start --web",
     "start": "expo start",
     "android": "expo start --android",

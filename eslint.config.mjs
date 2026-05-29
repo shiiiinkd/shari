@@ -67,5 +67,15 @@ export default ts.config(
       "@typescript-eslint/no-require-imports": "off",
     },
   },
+  {
+    // 実機 Expo Go 用の起動スクリプト（Node ESM ランタイムで実行）。Node globals を許可する。
+    files: ["apps/mobile/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+      },
+    },
+  },
   prettier,
 );
