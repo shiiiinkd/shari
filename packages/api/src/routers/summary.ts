@@ -18,8 +18,11 @@
  *   - DB 列は snake_case、procedure 入出力は camelCase（@shari/shared schema 準拠）
  */
 import {
+  SUMMARY_NOT_CACHED_SLUG,
   summaryCreateInputSchema,
   summaryCreateOutputSchema,
+  summaryGetInputSchema,
+  summaryGetOutputSchema,
   type TranscriptSegment,
 } from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -49,6 +52,68 @@ const cachedVideoSchema = z.object({
 });
 
 export const summaryRouter = router({
+  /**
+   * 保存済み要約の読み取り専用取得（Library からの閲覧用）。
+   * create と違い字幕取得・Claude 呼び出し・requests ログを一切行わない。
+   *
+   * prompt_version の選び方（handoff 設計）:
+   *   1. 現行 prompt_version を優先
+   *   2. 無ければ version 問わず最新（created_at 降順の先頭）
+   *   3. それも無ければ NOT_FOUND（slug: summary_not_cached）→ mobile は「再要約する」を出す
+   */
+  get: protectedProcedure
+    .input(summaryGetInputSchema)
+    .output(summaryGetOutputSchema)
+    .query(async ({ input, ctx }) => {
+      const { videoId, language } = input;
+      const promptVersion = ctx.services.currentPromptVersion;
+
+      // 1. 現行 prompt_version を優先
+      const currentRes = await ctx.supabase
+        .from("summaries")
+        .select("summary_md, model")
+        .eq("video_id", videoId)
+        .eq("language", language)
+        .eq("prompt_version", promptVersion)
+        .maybeSingle();
+      if (currentRes.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `summary_get_lookup_failed: ${currentRes.error.message}`,
+        });
+      }
+      if (currentRes.data) {
+        const c = cachedSummarySchema.parse(currentRes.data);
+        return { summaryMd: c.summary_md, language, model: c.model };
+      }
+
+      // 2. version 問わず最新（created_at 降順の先頭）
+      const latestRes = await ctx.supabase
+        .from("summaries")
+        .select("summary_md, model")
+        .eq("video_id", videoId)
+        .eq("language", language)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestRes.error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `summary_get_lookup_failed: ${latestRes.error.message}`,
+        });
+      }
+      if (latestRes.data) {
+        const c = cachedSummarySchema.parse(latestRes.data);
+        return { summaryMd: c.summary_md, language, model: c.model };
+      }
+
+      // 3. 見つからない → NOT_FOUND。勝手に再生成（課金）せず mobile 側の手動切替に委ねる。
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `${SUMMARY_NOT_CACHED_SLUG}: no cached summary for ${videoId} (${language})`,
+      });
+    }),
+
   create: protectedProcedure
     .input(summaryCreateInputSchema)
     .output(summaryCreateOutputSchema)
