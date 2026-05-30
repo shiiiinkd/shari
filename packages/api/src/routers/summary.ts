@@ -56,6 +56,12 @@ export const summaryRouter = router({
    * 保存済み要約の読み取り専用取得（Library からの閲覧用）。
    * create と違い字幕取得・Claude 呼び出し・requests ログを一切行わない。
    *
+   * 認可: summaries は (video_id, language, prompt_version) で **user 非依存の共有キャッシュ**。
+   *   ownership を確認せず service_role で引くと、任意の videoId についてキャッシュ有無を
+   *   覗ける（列挙オラクル）＋ create の利用ログ/上限経路を迂回できる。よって「自分が
+   *   要約した動画（requests に自分の行がある）」に限定する。閲覧導線（Library）は元々
+   *   自分の履歴 videoId しか辿らないため正規フローに影響しない。
+   *
    * prompt_version の選び方（handoff 設計）:
    *   1. 現行 prompt_version を優先
    *   2. 無ければ version 問わず最新（created_at 降順の先頭）
@@ -67,6 +73,26 @@ export const summaryRouter = router({
     .query(async ({ input, ctx }) => {
       const { videoId, language } = input;
       const promptVersion = ctx.services.currentPromptVersion;
+
+      // 0. 認可: 自分が要約した動画か（requests に自分の行があるか）を確認。
+      //    無ければ「未保存」と同一の NOT_FOUND(summary_not_cached) に倒し、共有キャッシュの
+      //    存在有無も漏らさない。requests は (user, video) で複数行ありうるので limit(1)。
+      const ownRequest = await ctx.supabase
+        .from("requests")
+        .select("video_id")
+        .eq("user_id", ctx.user.id)
+        .eq("video_id", videoId)
+        .limit(1)
+        .maybeSingle();
+      if (ownRequest.error) {
+        throw internalError("summary_get_ownership_check_failed", ownRequest.error);
+      }
+      if (!ownRequest.data) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `${SUMMARY_NOT_CACHED_SLUG}: no history for ${videoId} (${language})`,
+        });
+      }
 
       // 1. 現行 prompt_version を優先
       const currentRes = await ctx.supabase
