@@ -35,7 +35,15 @@ export function useSummary(videoId: string, mode: ResultMode): UseSummaryResult 
   // 生成（create）を発動したか。new は最初から true、view は再要約で true になる。
   const [generating, setGenerating] = useState(mode === "new");
 
-  const createMutation = trpc.summary.create.useMutation();
+  const utils = trpc.useUtils();
+  const createMutation = trpc.summary.create.useMutation({
+    onSuccess: () => {
+      // 新規要約で履歴（library.history）が増える。Library タブは常時マウントされたまま
+      // で RN のタブフォーカスでは自動再取得しないため、成功時に invalidate して
+      // マウント済みなら即時・未マウントなら次回フォーカス時にフレッシュ取得させる。
+      void utils.library.history.invalidate();
+    },
+  });
   const getQuery = trpc.summary.get.useQuery(
     { videoId, language: "ja" },
     // view で、まだ生成へ切り替えていない間だけ読み取りクエリを有効化。
