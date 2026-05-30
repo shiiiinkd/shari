@@ -8,10 +8,11 @@
  * 設計判断は .handoff/handoff-2026-05-27-1627.md の「確定済みの設計判断」参照。
  */
 
-/** クライアントが UX を切り替えるためのエラー区分（5 種）。 */
+/** クライアントが UX を切り替えるためのエラー区分（6 種）。 */
 export type ErrorCode =
   | "NO_TRANSCRIPT"
   | "VIDEO_NOT_FOUND"
+  | "SUMMARY_NOT_CACHED"
   | "RATE_LIMITED"
   | "UPSTREAM_FAILED"
   | "SERVER_ERROR";
@@ -30,6 +31,11 @@ export const TRANSCRIPT_SERVICE_UNAVAILABLE_SLUG = "transcript_service_unavailab
 export const YOUTUBE_OEMBED_FAILED_SLUG = "youtube_oembed_failed";
 export const YOUTUBE_OEMBED_UNEXPECTED_SHAPE_SLUG = "youtube_oembed_unexpected_shape";
 export const LLM_OVERLOADED_SLUG = "llm_overloaded";
+/**
+ * summary.get（閲覧モード）で保存済み要約が見つからなかった場合の slug。
+ * mobile は通常の「もう一度試す」ではなく「再要約する」（new 生成への手動切替）を出す。
+ */
+export const SUMMARY_NOT_CACHED_SLUG = "summary_not_cached";
 
 interface ErrorCodeDisplay {
   /** ユーザーに見せる日本語メッセージ。 */
@@ -45,6 +51,11 @@ export const ERROR_CODE_DISPLAY: Record<ErrorCode, ErrorCodeDisplay> = {
   },
   VIDEO_NOT_FOUND: {
     displayMessage: "動画が見つからないか非公開です",
+    retryable: false,
+  },
+  SUMMARY_NOT_CACHED: {
+    // 通常の再試行ではなく「再要約する」（new 生成への切替）を出すため retryable=false。
+    displayMessage: "保存済みの要約が見つかりませんでした",
     retryable: false,
   },
   RATE_LIMITED: {
@@ -86,6 +97,7 @@ export function normalizeError(err: NormalizableError | null | undefined): Error
   if (code === "NOT_FOUND") {
     if (message.startsWith(TRANSCRIPT_UNAVAILABLE_SLUG)) return "NO_TRANSCRIPT";
     if (message.startsWith(VIDEO_UNAVAILABLE_SLUG)) return "VIDEO_NOT_FOUND";
+    if (message.startsWith(SUMMARY_NOT_CACHED_SLUG)) return "SUMMARY_NOT_CACHED";
     return "SERVER_ERROR";
   }
   if (code === "TOO_MANY_REQUESTS") return "RATE_LIMITED";

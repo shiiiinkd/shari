@@ -81,6 +81,21 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 /**
+ * 内部処理（Supabase / DB アクセス等）の失敗を INTERNAL_SERVER_ERROR にくるむ共通ヘルパ。
+ *
+ * クライアントに渡る `TRPCError.message` は安定した slug のみにし、DB ドライバ由来の
+ * 内部メッセージ（列名・制約名・SQL 断片）を露出させない。元の失敗は `cause` に載せる。
+ * `cause` は tRPC の既定 errorFormatter ではクライアントに送出されず、
+ * apps/backend の trpcServer `onError` ハンドラがサーバ側ログ（Cloudflare）にのみ残す。
+ *
+ * @param slug 失敗箇所を表す安定した識別子（例 "summary_get_lookup_failed"）。ログ突合用。
+ * @param cause 元の失敗（Supabase の PostgrestError 等）。サーバ側ログにのみ出る。
+ */
+export function internalError(slug: string, cause: unknown): TRPCError {
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: slug, cause });
+}
+
+/**
  * 認証必須 procedure。ctx.user が無ければ UNAUTHORIZED を返す。
  * 通過後の ctx.user は non-nullable に narrowing される。
  */

@@ -1,52 +1,28 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RelatedArticle } from "@shari/shared";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
 import { Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { Skeleton } from "../components/Skeleton";
+import { useSummary, type SummaryState } from "../hooks/useSummary";
 import { ERROR_CODE_DISPLAY, normalizeError, type ErrorCode } from "../lib/error";
 import { trpc } from "../lib/trpc";
-import type { RootStackParamList } from "../navigation/types";
+import type { ResultScreenProps } from "../navigation/types";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Result">;
+type Props = ResultScreenProps;
 
 /**
  * Result:
- *   1. mount → summary.create を mutate（字幕取得 + Claude 要約）
- *   2. summary 成功 → articles.relatedFor を mutate
- *   段階表示: summary が出るまでスピナー → 要約描画 → その下で articles の取得が走る
+ *   mode="new"  → summary.create（字幕取得 + Claude 要約）。成功後に関連記事を取得。
+ *   mode="view" → summary.get（保存済みの読み取り専用）。関連記事は出さない。
+ *                 保存が無ければ「再要約する」で create 経路へ手動切替。
  *
- * mutation を使う理由:
- *   - backend では両 procedure が DB 書き込みを伴うため mutation 定義
- *   - mobile からも useMutation 経由で扱い、再試行はユーザー操作（戻る → 再送）に委ねる
- *   - useQuery を使うと「マウント / フォーカス時に勝手に走る」挙動になり、料金が嵩む
+ * create / get の非対称は useSummary に隠蔽。関連記事は「フレッシュ生成（fresh）に伴う時だけ」出す
+ * = view からの再要約後は出る、純粋な閲覧では出ない（Qiita 毎回コールの回避）。
  */
 export function ResultScreen({ route }: Props) {
-  const { videoId } = route.params;
-
-  const summaryMutation = trpc.summary.create.useMutation();
-  const articlesMutation = trpc.articles.relatedFor.useMutation();
-
-  // summary.create は videoId が決まり次第すぐ実行。
-  // 依存配列は videoId のみ（mutate 関数は react-query が安定参照を保証する）。
-  const { mutate: createSummary } = summaryMutation;
-  useEffect(() => {
-    createSummary({ videoId, language: "ja" });
-  }, [videoId, createSummary]);
-
-  // summary 成功後に articles を呼ぶ。
-  // 成功状態を切り出して依存に入れることで、isSuccess の遷移時のみ発火する。
-  const summarySuccess = summaryMutation.isSuccess;
-  const { mutate: fetchArticles } = articlesMutation;
-  useEffect(() => {
-    if (summarySuccess) {
-      fetchArticles({ videoId });
-    }
-  }, [summarySuccess, videoId, fetchArticles]);
-
-  const summaryErrorCode = summaryMutation.error ? normalizeError(summaryMutation.error) : null;
-  const articlesErrorCode = articlesMutation.error ? normalizeError(articlesMutation.error) : null;
+  const { videoId, mode } = route.params;
+  const summary = useSummary(videoId, mode);
 
   return (
     <ScrollView
@@ -54,57 +30,61 @@ export function ResultScreen({ route }: Props) {
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
     >
-      <SummarySection
+      <SummaryView
         videoId={videoId}
-        isPending={summaryMutation.isPending}
-        errorCode={summaryErrorCode}
-        summaryMd={summaryMutation.data?.summaryMd ?? null}
-        cacheHit={summaryMutation.data?.cacheHit ?? null}
-        onRetry={() => createSummary({ videoId, language: "ja" })}
+        state={summary.state}
+        isGenerating={summary.isGenerating}
+        onRetry={summary.retry}
+        onReSummarize={summary.reSummarize}
       />
 
-      {summarySuccess && (
-        <ArticlesSection
-          isPending={articlesMutation.isPending}
-          errorCode={articlesErrorCode}
-          articles={articlesMutation.data?.articles ?? null}
-          onRetry={() => fetchArticles({ videoId })}
-        />
+      {summary.state.kind === "success" && summary.state.fresh && (
+        <ArticlesContainer videoId={videoId} />
       )}
     </ScrollView>
   );
 }
 
-function SummarySection(props: {
+function SummaryView(props: {
   videoId: string;
-  isPending: boolean;
-  errorCode: ErrorCode | null;
-  summaryMd: string | null;
-  cacheHit: boolean | null;
+  state: SummaryState;
+  isGenerating: boolean;
   onRetry: () => void;
+  onReSummarize: () => void;
 }) {
-  // コピー完了の表示を 2 秒だけ出すための一時 state。
+  // コピー完了表示を 2 秒だけ出すための一時 state。
   const [copied, setCopied] = useState(false);
-  // setTimeout は連打しても自動キャンセルされないため、ref に id を保持して
-  // 次タップ時に明示的に clear する。これがないと「2 連打→1 回目の timer が
-  // 早めに発火して、まだ 2 秒経っていない 2 回目の表示が消える」現象が起きる。
+  // 連打しても timer が誤発火しないよう、ref に id を保持して次タップ時に clear する。
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  if (props.errorCode) {
-    const display = ERROR_CODE_DISPLAY[props.errorCode];
+
+  const { state } = props;
+
+  if (state.kind === "error") {
+    const display = ERROR_CODE_DISPLAY[state.code];
     return (
       <View style={styles.errorBox}>
-        <Text style={styles.errorTitle}>要約取得に失敗しました</Text>
+        <Text style={styles.errorTitle}>
+          {state.notCached ? "保存済みの要約がありません" : "要約取得に失敗しました"}
+        </Text>
         <Text style={styles.errorMessage}>{display.displayMessage}</Text>
-        {display.retryable && (
+        {state.notCached ? (
+          <Pressable
+            style={styles.primaryButton}
+            onPress={props.onReSummarize}
+            accessibilityRole="button"
+          >
+            <Text style={styles.primaryButtonText}>再要約する</Text>
+          </Pressable>
+        ) : state.retryable ? (
           <Pressable style={styles.retryButton} onPress={props.onRetry} accessibilityRole="button">
             <Text style={styles.retryButtonText}>もう一度試す</Text>
           </Pressable>
-        )}
+        ) : null}
       </View>
     );
   }
 
-  if (props.isPending || !props.summaryMd) {
+  if (state.kind === "loading") {
     return (
       <View>
         <View style={styles.sectionHeader}>
@@ -116,12 +96,14 @@ function SummarySection(props: {
           <Skeleton height={14} width="85%" />
           <Skeleton height={14} width="60%" />
         </View>
-        <Text style={styles.loadingHint}>字幕を取得して要約中（初回は 20〜40 秒）</Text>
+        {props.isGenerating && (
+          <Text style={styles.loadingHint}>字幕を取得して要約中（初回は 20〜40 秒）</Text>
+        )}
       </View>
     );
   }
 
-  const summaryMd = props.summaryMd;
+  const summaryMd = state.summaryMd;
   const shareText = `${summaryMd}\n\n元動画: https://youtu.be/${props.videoId}`;
 
   const handleCopy = async () => {
@@ -137,8 +119,8 @@ function SummarySection(props: {
   };
 
   const handleShare = async () => {
-    // ユーザーがシェアシートを閉じた場合や、Web Share API 非対応環境では
-    // reject される。UX 上致命的ではないので静かに無視する。
+    // シェアシートを閉じた場合や Web Share API 非対応環境では reject される。
+    // UX 上致命的ではないので静かに無視する。
     await Share.share({ message: shareText }).catch(() => undefined);
   };
 
@@ -146,7 +128,7 @@ function SummarySection(props: {
     <View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>要約</Text>
-        {props.cacheHit && <Text style={styles.cacheBadge}>cache</Text>}
+        {state.cacheHit && <Text style={styles.cacheBadge}>cache</Text>}
       </View>
       <Markdown style={markdownStyles}>{summaryMd}</Markdown>
       <View style={styles.actionRow}>
@@ -168,6 +150,30 @@ function SummarySection(props: {
         </Pressable>
       </View>
     </View>
+  );
+}
+
+/**
+ * 関連記事の取得 + 表示。fresh 生成成功時のみ mount され、その場で 1 回 fetch する。
+ * view（純粋な閲覧）では mount されないため Qiita を叩かない。
+ */
+function ArticlesContainer({ videoId }: { videoId: string }) {
+  const articlesMutation = trpc.articles.relatedFor.useMutation();
+  const { mutate: fetchArticles } = articlesMutation;
+
+  useEffect(() => {
+    fetchArticles({ videoId });
+  }, [videoId, fetchArticles]);
+
+  const errorCode = articlesMutation.error ? normalizeError(articlesMutation.error) : null;
+
+  return (
+    <ArticlesSection
+      isPending={articlesMutation.isPending}
+      errorCode={errorCode}
+      articles={articlesMutation.data?.articles ?? null}
+      onRetry={() => fetchArticles({ videoId })}
+    />
   );
 }
 
@@ -335,6 +341,19 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 13,
+    fontWeight: "600",
+  },
+  primaryButton: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    backgroundColor: "#0a7",
+    borderRadius: 6,
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "600",
   },
   actionRow: {

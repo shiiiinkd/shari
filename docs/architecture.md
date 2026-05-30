@@ -252,7 +252,7 @@ DB アクセスは:
 
 ### apps/mobile (Expo)
 
-- Expo 56 固定。バージョン差異が大きいので新規コード前に必ず公式 v56 ドキュメント参照
+- Expo 54 固定（ストア配信の Expo Go が SDK54 までのため上げない）。バージョン差異が大きいので新規コード前に必ず公式 v54 ドキュメント参照
 - `EXPO_PUBLIC_*` 環境変数は **バンドルに焼き込まれて公開される**。シークレットを入れない
 - tRPC 型は `import type { AppRouter } from "@shari/api"` 経由。**相対パス import 禁止**
 - ネイティブモジュール追加時は Expo Managed Workflow の範囲内か事前確認（範囲外なら Bare 移行が必要になる）
@@ -265,7 +265,7 @@ DB アクセスは:
 - データモデル: [./data-model.md](./data-model.md)
 - コミット規約: [../.claude/skills/commit/SKILL.md](../.claude/skills/commit/SKILL.md)
 - レビュー観点: [../.claude/skills/code-review/SKILL.md](../.claude/skills/code-review/SKILL.md)
-- Expo v56 公式: https://docs.expo.dev/versions/v56.0.0/
+- Expo v54 公式: https://docs.expo.dev/versions/v54.0.0/
 - Hono on Workers: https://hono.dev/docs/getting-started/cloudflare-workers
 - tRPC v11: https://trpc.io/docs
 - Cloudflare Workers 制限: https://developers.cloudflare.com/workers/platform/limits/

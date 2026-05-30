@@ -18,14 +18,17 @@
  *   - DB 列は snake_case、procedure 入出力は camelCase（@shari/shared schema 準拠）
  */
 import {
+  SUMMARY_NOT_CACHED_SLUG,
   summaryCreateInputSchema,
   summaryCreateOutputSchema,
+  summaryGetInputSchema,
+  summaryGetOutputSchema,
   type TranscriptSegment,
 } from "@shari/shared";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import { internalError, protectedProcedure, router } from "../trpc.js";
 
 const cachedSummarySchema = z.object({
   summary_md: z.string(),
@@ -49,6 +52,88 @@ const cachedVideoSchema = z.object({
 });
 
 export const summaryRouter = router({
+  /**
+   * 保存済み要約の読み取り専用取得（Library からの閲覧用）。
+   * create と違い字幕取得・Claude 呼び出し・requests ログを一切行わない。
+   *
+   * 認可: summaries は (video_id, language, prompt_version) で **user 非依存の共有キャッシュ**。
+   *   ownership を確認せず service_role で引くと、任意の videoId についてキャッシュ有無を
+   *   覗ける（列挙オラクル）＋ create の利用ログ/上限経路を迂回できる。よって「自分が
+   *   要約した動画（requests に自分の行がある）」に限定する。閲覧導線（Library）は元々
+   *   自分の履歴 videoId しか辿らないため正規フローに影響しない。
+   *
+   * prompt_version の選び方（handoff 設計）:
+   *   1. 現行 prompt_version を優先
+   *   2. 無ければ version 問わず最新（created_at 降順の先頭）
+   *   3. それも無ければ NOT_FOUND（slug: summary_not_cached）→ mobile は「再要約する」を出す
+   */
+  get: protectedProcedure
+    .input(summaryGetInputSchema)
+    .output(summaryGetOutputSchema)
+    .query(async ({ input, ctx }) => {
+      const { videoId, language } = input;
+      const promptVersion = ctx.services.currentPromptVersion;
+
+      // 0. 認可: 自分が要約した動画か（requests に自分の行があるか）を確認。
+      //    無ければ「未保存」と同一の NOT_FOUND(summary_not_cached) に倒し、共有キャッシュの
+      //    存在有無も漏らさない。requests は (user, video) で複数行ありうるので limit(1)。
+      const ownRequest = await ctx.supabase
+        .from("requests")
+        .select("video_id")
+        .eq("user_id", ctx.user.id)
+        .eq("video_id", videoId)
+        .limit(1)
+        .maybeSingle();
+      if (ownRequest.error) {
+        throw internalError("summary_get_ownership_check_failed", ownRequest.error);
+      }
+      if (!ownRequest.data) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `${SUMMARY_NOT_CACHED_SLUG}: no history for ${videoId} (${language})`,
+        });
+      }
+
+      // 1. 現行 prompt_version を優先
+      const currentRes = await ctx.supabase
+        .from("summaries")
+        .select("summary_md, model")
+        .eq("video_id", videoId)
+        .eq("language", language)
+        .eq("prompt_version", promptVersion)
+        .maybeSingle();
+      if (currentRes.error) {
+        throw internalError("summary_get_lookup_failed", currentRes.error);
+      }
+      if (currentRes.data) {
+        const c = cachedSummarySchema.parse(currentRes.data);
+        return { summaryMd: c.summary_md, language, model: c.model };
+      }
+
+      // 2. version 問わず最新（created_at 降順の先頭）
+      const latestRes = await ctx.supabase
+        .from("summaries")
+        .select("summary_md, model")
+        .eq("video_id", videoId)
+        .eq("language", language)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestRes.error) {
+        throw internalError("summary_get_lookup_failed", latestRes.error);
+      }
+      if (latestRes.data) {
+        const c = cachedSummarySchema.parse(latestRes.data);
+        return { summaryMd: c.summary_md, language, model: c.model };
+      }
+
+      // 3. 見つからない → NOT_FOUND。勝手に再生成（課金）せず mobile 側の手動切替に委ねる。
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: `${SUMMARY_NOT_CACHED_SLUG}: no cached summary for ${videoId} (${language})`,
+      });
+    }),
+
   create: protectedProcedure
     .input(summaryCreateInputSchema)
     .output(summaryCreateOutputSchema)
@@ -67,10 +152,7 @@ export const summaryRouter = router({
         .maybeSingle();
 
       if (cachedRes.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `summary_cache_lookup_failed: ${cachedRes.error.message}`,
-        });
+        throw internalError("summary_cache_lookup_failed", cachedRes.error);
       }
 
       if (cachedRes.data) {
@@ -98,16 +180,10 @@ export const summaryRouter = router({
       // YouTube fetch にフォールバック → upsert で再エラー、で原因が不可視になるため
       // ここで明示的に落とす。
       if (videoRow.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `videos_cache_lookup_failed: ${videoRow.error.message}`,
-        });
+        throw internalError("videos_cache_lookup_failed", videoRow.error);
       }
       if (transcriptRow.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `transcripts_cache_lookup_failed: ${transcriptRow.error.message}`,
-        });
+        throw internalError("transcripts_cache_lookup_failed", transcriptRow.error);
       }
 
       let videoTitle: string;
@@ -147,10 +223,7 @@ export const summaryRouter = router({
           has_transcript: true,
         });
         if (videoUpsert.error) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `videos_upsert_failed: ${videoUpsert.error.message}`,
-          });
+          throw internalError("videos_upsert_failed", videoUpsert.error);
         }
 
         // transcripts キャッシュに upsert。PK は video_id 単独。
@@ -161,10 +234,7 @@ export const summaryRouter = router({
           text_length: transcript.textLength,
         });
         if (transcriptUpsert.error) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `transcripts_upsert_failed: ${transcriptUpsert.error.message}`,
-          });
+          throw internalError("transcripts_upsert_failed", transcriptUpsert.error);
         }
       }
 
@@ -196,10 +266,7 @@ export const summaryRouter = router({
         { onConflict: "video_id,language,prompt_version" },
       );
       if (upsertRes.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `summaries_upsert_failed: ${upsertRes.error.message}`,
-        });
+        throw internalError("summaries_upsert_failed", upsertRes.error);
       }
 
       // 5. requests ログ
@@ -228,9 +295,6 @@ async function logRequest(
     cache_hit: cacheHit,
   });
   if (res.error) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `requests_log_failed: ${res.error.message}`,
-    });
+    throw internalError("requests_log_failed", res.error);
   }
 }

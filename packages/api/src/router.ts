@@ -6,6 +6,7 @@
  */
 import { helloInputSchema } from "@shari/shared";
 import { articlesRouter } from "./routers/articles.js";
+import { libraryRouter } from "./routers/library.js";
 import { summaryRouter } from "./routers/summary.js";
 import { publicProcedure, router } from "./trpc.js";
 
@@ -23,6 +24,9 @@ export const appRouter = router({
 
   /** 関連技術記事（Qiita / Zenn）取得 procedure。 */
   articles: articlesRouter,
+
+  /** ライブラリ（要約履歴）procedure。 */
+  library: libraryRouter,
 });
 
 export type AppRouter = typeof appRouter;

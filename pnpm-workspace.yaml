@@ -11,8 +11,8 @@ allowBuilds:
 # モノレポ内で複数バージョンが混在しないように固定
 # （Expo + react-native は単一バージョンが必須）
 overrides:
-  react: 19.2.3
-  react-native: 0.85.3
+  react: 19.1.0
+  react-native: 0.81.5
 
 # build scripts の許可リスト
 # - workerd: Cloudflare Workers のローカルランタイム（wrangler dev に必須）
@@ -22,3 +22,15 @@ onlyBuiltDependencies:
   - esbuild
   - sharp
   - workerd
+
+minimumReleaseAgeExclude:
+  - "@expo/cli@54.0.25"
+  - "@expo/json-file@10.0.16"
+  - "@expo/metro-config@54.0.16"
+  - "@expo/plist@0.4.9"
+  - babel-preset-expo@54.0.11
+  - expo-file-system@19.0.23
+  - expo-font@14.0.12
+  - expo-modules-autolinking@3.0.26
+  - expo-server@1.0.7
+  - expo@54.0.35
