@@ -233,7 +233,16 @@ function ArticlesSection(props: {
         </View>
       )}
 
-      {errorDisplay && <Text style={styles.articlesError}>関連記事の取得に失敗しました。</Text>}
+      {errorDisplay && (
+        <View style={styles.articlesErrorBox}>
+          <Text style={styles.articlesError}>{errorDisplay.displayMessage}</Text>
+          {errorDisplay.retryable && (
+            <Pressable onPress={props.onRetry} accessibilityRole="button" hitSlop={6}>
+              <Text style={styles.articlesRetry}>もう一度試す</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {!props.isPending && props.articles && props.articles.length === 0 && (
         <Text style={styles.articlesEmpty}>関連記事が見つかりませんでした。</Text>
@@ -367,9 +376,19 @@ const styles = StyleSheet.create({
     ...type.caption,
     color: colors.textTertiary,
   },
+  articlesErrorBox: {
+    gap: 8,
+    alignItems: "flex-start",
+  },
   articlesError: {
     ...type.caption,
     color: colors.textTertiary,
+  },
+  articlesRetry: {
+    ...type.secondaryBtn,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textDecorationLine: "underline",
   },
   articleCard: {
     borderWidth: 1,
