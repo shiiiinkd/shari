@@ -31,13 +31,18 @@ type Props = ResultScreenProps;
  *   - loading           → 上寄せのスケルトン
  *   - success / view    → スクロール本文（要約 Markdown ＋ fresh 時のみ関連記事）
  */
-export function ResultScreen({ route }: Props) {
+export function ResultScreen({ route, navigation }: Props) {
   const { videoId, mode } = route.params;
   const summary = useSummary(videoId, mode);
   const { state } = summary;
 
   if (state.kind === "error") {
-    const status = resolveErrorStatus(state, summary.retry, summary.reSummarize);
+    const status = resolveErrorStatus(state, {
+      onRetry: summary.retry,
+      onReSummarize: summary.reSummarize,
+      // 確定失敗（字幕なし・動画なし）の「次の一手」: 別動画を入れ直せる Summarize タブへ。
+      onBrowseAnother: () => navigation.navigate("Tabs", { screen: "Summarize" }),
+    });
     return (
       <View style={styles.fill}>
         <StatusState
@@ -87,8 +92,7 @@ export function ResultScreen({ route }: Props) {
 /** エラー区分を「落ち着いた状態画面」のイラスト・文言・アクションに対応づける。 */
 function resolveErrorStatus(
   state: Extract<SummaryState, { kind: "error" }>,
-  onRetry: () => void,
-  onReSummarize: () => void,
+  actions: { onRetry: () => void; onReSummarize: () => void; onBrowseAnother: () => void },
 ): { art: ReactNode; title: string; body: string; primaryLabel?: string; onPrimary?: () => void } {
   const display = ERROR_CODE_DISPLAY[state.code];
 
@@ -98,7 +102,7 @@ function resolveErrorStatus(
       title: "保存済みの要約がありません",
       body: "この動画はまだ要約されていません。今すぐ要約できます。",
       primaryLabel: "再要約する",
-      onPrimary: onReSummarize,
+      onPrimary: actions.onReSummarize,
     };
   }
 
@@ -129,13 +133,23 @@ function resolveErrorStatus(
       title = "うまく読み込めませんでした";
   }
 
-  // どんなエラーでも「もう一度試す」を出す（種別ごとの固有文は body に残す）。
+  // 一過性エラー（retryable）だけ「もう一度試す」。字幕なし・動画なしのような確定失敗は
+  // 再試行しても同じ結果なので、別動画を入れ直す導線（Summarize へ）に差し替える。
+  if (display.retryable) {
+    return {
+      art,
+      title,
+      body: display.displayMessage,
+      primaryLabel: "もう一度試す",
+      onPrimary: actions.onRetry,
+    };
+  }
   return {
     art,
     title,
     body: display.displayMessage,
-    primaryLabel: "もう一度試す",
-    onPrimary: onRetry,
+    primaryLabel: "別の動画を要約する",
+    onPrimary: actions.onBrowseAnother,
   };
 }
 
