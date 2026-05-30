@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, radii } from "../theme";
 
@@ -20,25 +20,64 @@ export function SettingsScreen() {
     >
       <View style={styles.brand}>
         <Text style={styles.appName}>shari</Text>
-        <Text style={styles.version}>バージョン {version}</Text>
+        <Text style={styles.tagline}>YouTube 技術動画の日本語要約</Text>
       </View>
 
       <View style={styles.card}>
-        <SettingsRow label="バージョン" detail={version} />
-        <SettingsRow label="このアプリについて" last />
+        <SettingsRow label="バージョン" detail={version} last />
+      </View>
+
+      <View style={styles.about}>
+        <Text style={styles.aboutTitle}>このアプリについて</Text>
+        <Text style={styles.aboutBody}>
+          技術系 YouTube
+          動画の字幕を取得し、日本のエンジニア向けに日本語で要約します。要約した動画はライブラリから再閲覧できます。
+        </Text>
       </View>
     </ScrollView>
   );
 }
 
-function SettingsRow({ label, detail, last }: { label: string; detail?: string; last?: boolean }) {
-  return (
-    <View style={[styles.row, !last && styles.rowDivider]}>
+/**
+ * 設定行。`onPress` を渡したときだけ Pressable + chevron（タップ可能の affordance）にする。
+ * 遷移先が無い行に chevron を出すと「押せそうで押せない」誤誘導になるため、明示的に分岐する。
+ */
+function SettingsRow({
+  label,
+  detail,
+  last,
+  onPress,
+}: {
+  label: string;
+  detail?: string;
+  last?: boolean;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
       <Text style={styles.rowLabel}>{label}</Text>
       {detail && <Text style={styles.rowDetail}>{detail}</Text>}
-      <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
-    </View>
+      {onPress && <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />}
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        style={({ pressed }) => [
+          styles.row,
+          !last && styles.rowDivider,
+          pressed && styles.rowPressed,
+        ]}
+        onPress={onPress}
+        accessibilityRole="button"
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={[styles.row, !last && styles.rowDivider]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -60,7 +99,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     letterSpacing: 0.26, // 0.01em
   },
-  version: {
+  tagline: {
     fontSize: 13,
     color: colors.textTertiary,
   },
@@ -81,6 +120,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  rowPressed: {
+    backgroundColor: colors.surface,
+  },
   rowLabel: {
     flex: 1,
     fontSize: 15,
@@ -90,5 +132,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textTertiary,
     marginRight: 8,
+  },
+  about: {
+    marginTop: 24,
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  aboutTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  aboutBody: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.textSecondary,
   },
 });
