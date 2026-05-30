@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, type DimensionValue, type ViewStyle } from "react-native";
+import { Animated, Easing, StyleSheet, type DimensionValue, type ViewStyle } from "react-native";
+import { colors, radii } from "../theme";
 
 type Props = {
   width?: DimensionValue;
@@ -9,23 +10,25 @@ type Props = {
 };
 
 /**
- * Skeleton: opacity を 0.4 ↔ 1.0 でフェードさせるグレー矩形。
+ * Skeleton: opacity を 0.45 ↔ 1.0 でフェードさせるグレー矩形（モックの shariPulse 1.5s ease-in-out 相当）。
  * useNativeDriver は web では noop だが opacity は CSS で補間されるので問題なし。
  */
-export function Skeleton({ width = "100%", height, borderRadius = 4, style }: Props) {
-  const opacity = useRef(new Animated.Value(0.4)).current;
+export function Skeleton({ width = "100%", height, borderRadius = radii.sm, style }: Props) {
+  const opacity = useRef(new Animated.Value(0.45)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 700,
+          duration: 750,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
-          toValue: 0.4,
-          duration: 700,
+          toValue: 0.45,
+          duration: 750,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ]),
@@ -39,6 +42,6 @@ export function Skeleton({ width = "100%", height, borderRadius = 4, style }: Pr
 
 const styles = StyleSheet.create({
   base: {
-    backgroundColor: "#e8e8e8",
+    backgroundColor: colors.skeleton,
   },
 });
