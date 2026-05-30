@@ -28,7 +28,7 @@ import {
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import { internalError, protectedProcedure, router } from "../trpc.js";
 
 const cachedSummarySchema = z.object({
   summary_md: z.string(),
@@ -77,10 +77,7 @@ export const summaryRouter = router({
         .eq("prompt_version", promptVersion)
         .maybeSingle();
       if (currentRes.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `summary_get_lookup_failed: ${currentRes.error.message}`,
-        });
+        throw internalError("summary_get_lookup_failed", currentRes.error);
       }
       if (currentRes.data) {
         const c = cachedSummarySchema.parse(currentRes.data);
@@ -97,10 +94,7 @@ export const summaryRouter = router({
         .limit(1)
         .maybeSingle();
       if (latestRes.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `summary_get_lookup_failed: ${latestRes.error.message}`,
-        });
+        throw internalError("summary_get_lookup_failed", latestRes.error);
       }
       if (latestRes.data) {
         const c = cachedSummarySchema.parse(latestRes.data);
@@ -132,10 +126,7 @@ export const summaryRouter = router({
         .maybeSingle();
 
       if (cachedRes.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `summary_cache_lookup_failed: ${cachedRes.error.message}`,
-        });
+        throw internalError("summary_cache_lookup_failed", cachedRes.error);
       }
 
       if (cachedRes.data) {
@@ -163,16 +154,10 @@ export const summaryRouter = router({
       // YouTube fetch にフォールバック → upsert で再エラー、で原因が不可視になるため
       // ここで明示的に落とす。
       if (videoRow.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `videos_cache_lookup_failed: ${videoRow.error.message}`,
-        });
+        throw internalError("videos_cache_lookup_failed", videoRow.error);
       }
       if (transcriptRow.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `transcripts_cache_lookup_failed: ${transcriptRow.error.message}`,
-        });
+        throw internalError("transcripts_cache_lookup_failed", transcriptRow.error);
       }
 
       let videoTitle: string;
@@ -212,10 +197,7 @@ export const summaryRouter = router({
           has_transcript: true,
         });
         if (videoUpsert.error) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `videos_upsert_failed: ${videoUpsert.error.message}`,
-          });
+          throw internalError("videos_upsert_failed", videoUpsert.error);
         }
 
         // transcripts キャッシュに upsert。PK は video_id 単独。
@@ -226,10 +208,7 @@ export const summaryRouter = router({
           text_length: transcript.textLength,
         });
         if (transcriptUpsert.error) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `transcripts_upsert_failed: ${transcriptUpsert.error.message}`,
-          });
+          throw internalError("transcripts_upsert_failed", transcriptUpsert.error);
         }
       }
 
@@ -261,10 +240,7 @@ export const summaryRouter = router({
         { onConflict: "video_id,language,prompt_version" },
       );
       if (upsertRes.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `summaries_upsert_failed: ${upsertRes.error.message}`,
-        });
+        throw internalError("summaries_upsert_failed", upsertRes.error);
       }
 
       // 5. requests ログ
@@ -293,9 +269,6 @@ async function logRequest(
     cache_hit: cacheHit,
   });
   if (res.error) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `requests_log_failed: ${res.error.message}`,
-    });
+    throw internalError("requests_log_failed", res.error);
   }
 }

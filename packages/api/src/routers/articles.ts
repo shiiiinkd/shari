@@ -30,7 +30,7 @@
 import { articlesRelatedForInputSchema, articlesRelatedForOutputSchema } from "@shari/shared";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import { internalError, protectedProcedure, router } from "../trpc.js";
 
 const videoTitleRowSchema = z.object({
   title: z.string().min(1),
@@ -54,10 +54,7 @@ export const articlesRouter = router({
         .maybeSingle();
 
       if (videoRow.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `video_lookup_failed: ${videoRow.error.message}`,
-        });
+        throw internalError("video_lookup_failed", videoRow.error);
       }
 
       if (!videoRow.data) {

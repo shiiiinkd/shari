@@ -10,9 +10,8 @@
  *     **必ず .eq("user_id", ctx.user.id) で明示的に絞る**。
  */
 import { libraryHistoryInputSchema, libraryHistoryOutputSchema } from "@shari/shared";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../trpc.js";
+import { internalError, protectedProcedure, router } from "../trpc.js";
 
 /** view から取得する 1 行（snake_case）。 */
 const historyRowSchema = z.object({
@@ -47,10 +46,7 @@ export const libraryRouter = router({
         .range(offset, offset + limit);
 
       if (res.error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: `library_history_failed: ${res.error.message}`,
-        });
+        throw internalError("library_history_failed", res.error);
       }
 
       const rows = z.array(historyRowSchema).parse(res.data ?? []);
