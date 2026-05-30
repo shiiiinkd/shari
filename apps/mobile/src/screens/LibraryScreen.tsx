@@ -1,5 +1,5 @@
 import type { LibraryHistoryItem } from "@shari/shared";
-import { useCallback, useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Skeleton } from "../components/Skeleton";
@@ -116,7 +116,7 @@ export function LibraryScreen({ navigation }: Props) {
   );
 }
 
-function HistoryRow({
+const HistoryRow = memo(function HistoryRow({
   item,
   onPress,
 }: {
@@ -154,7 +154,7 @@ function HistoryRow({
       </View>
     </Pressable>
   );
-}
+});
 
 function Separator() {
   return <View style={styles.separator} />;
