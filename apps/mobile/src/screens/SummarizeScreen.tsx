@@ -2,9 +2,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import { youtubeUrlSchema } from "@shari/shared";
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PrimaryButton } from "../components/PrimaryButton";
+import { SecondaryButton } from "../components/SecondaryButton";
 import type { SummarizeScreenProps } from "../navigation/types";
+import { colors, radii, semantic, spacing, type } from "../theme";
 
 type Props = SummarizeScreenProps;
 
@@ -24,6 +27,7 @@ export function SummarizeScreen({ navigation }: Props) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [hasClipboardUrl, setHasClipboardUrl] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   // useFocusEffect: Summarize が再度アクティブになるたび評価し直す。
   // Result から戻ってきた時にもクリップボードに新しい URL が入っていれば反映できる。
@@ -69,35 +73,38 @@ export function SummarizeScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-      <Text style={styles.label}>YouTube URL を入力</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="https://www.youtube.com/watch?v=..."
-        value={url}
-        onChangeText={(v) => {
-          setUrl(v);
-          if (error) setError(null);
-        }}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-        returnKeyType="go"
-        onSubmitEditing={handleSubmit}
-      />
+      <View style={styles.field}>
+        <Text style={styles.label}>YouTube URL を入力</Text>
+        <View style={[styles.input, focused && styles.inputFocused]}>
+          <TextInput
+            style={styles.inputText}
+            placeholder="https://www.youtube.com/watch?v=..."
+            placeholderTextColor={colors.textTertiary}
+            value={url}
+            onChangeText={(v) => {
+              setUrl(v);
+              if (error) setError(null);
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="go"
+            onSubmitEditing={handleSubmit}
+          />
+        </View>
+      </View>
 
       {hasClipboardUrl && (
-        <Pressable style={styles.pasteBtn} onPress={handlePaste}>
-          <Text style={styles.pasteBtnText}>クリップボードから貼り付け</Text>
-        </Pressable>
+        <SecondaryButton
+          label="クリップボードから貼り付け"
+          icon="clipboard-outline"
+          onPress={handlePaste}
+        />
       )}
 
-      <Pressable
-        style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
-        onPress={handleSubmit}
-        disabled={!canSubmit}
-      >
-        <Text style={styles.submitBtnText}>要約する</Text>
-      </Pressable>
+      <PrimaryButton label="要約する" onPress={handleSubmit} disabled={!canSubmit} />
 
       {error && <Text style={styles.error}>{error}</Text>}
     </View>
@@ -107,52 +114,37 @@ export function SummarizeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
-    gap: 12,
-    backgroundColor: "#fff",
+    padding: spacing.screenPad,
+    gap: spacing.md,
+    backgroundColor: colors.bg,
+  },
+  field: {
+    gap: 2,
+    marginTop: spacing.sm,
   },
   label: {
-    fontSize: 14,
-    color: "#333",
-    marginTop: 8,
+    ...type.fieldLabel,
+    color: colors.labelInk,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    minHeight: 50,
+    borderRadius: radii.lg,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: semantic.inputBorder,
+    backgroundColor: colors.bg,
   },
-  pasteBtn: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: "#eef",
+  inputFocused: {
+    borderColor: semantic.inputFocusBorder,
   },
-  pasteBtnText: {
-    fontSize: 14,
-    color: "#225",
-  },
-  submitBtn: {
-    marginTop: 8,
-    paddingVertical: 14,
-    borderRadius: 8,
-    backgroundColor: "#0a7",
-    alignItems: "center",
-  },
-  submitBtnDisabled: {
-    backgroundColor: "#aaa",
-  },
-  submitBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+  inputText: {
+    fontSize: 15.5,
+    color: colors.textPrimary,
+    padding: 0,
   },
   error: {
-    color: "#c00",
-    fontSize: 14,
+    fontSize: 13,
+    color: colors.errorText,
   },
 });

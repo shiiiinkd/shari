@@ -1,22 +1,17 @@
 import type { LibraryHistoryItem } from "@shari/shared";
 import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Skeleton } from "../components/Skeleton";
+import { Spinner } from "../components/Spinner";
+import { StatusState } from "../components/StatusState";
+import { ArtBusy, ArtNoHistory } from "../components/illustrations";
 import { ERROR_CODE_DISPLAY, normalizeError } from "../lib/error";
 import { formatRelativeTime } from "../lib/relativeTime";
 import { trpc } from "../lib/trpc";
 import { youtubeThumbnailUrl } from "../lib/youtube";
 import type { LibraryScreenProps } from "../navigation/types";
+import { colors, radii, type } from "../theme";
 
 type Props = LibraryScreenProps;
 
@@ -66,29 +61,24 @@ export function LibraryScreen({ navigation }: Props) {
   // 初回ロード中はスケルトン（pull-to-refresh の再取得時は既存データを保持するので出さない）。
   if (isLoading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: insets.top + 4 }]}>
         <SkeletonList />
       </View>
     );
   }
 
-  // 初回ロードが失敗（データ皆無）。区分に応じた表示 + 再試行。
+  // 初回ロードが失敗（データ皆無）。落ち着いた中央レイアウトで表示（赤箱は使わない）。
+  // どんなエラーでも「もう一度試す」を出す。
   if (isError && items.length === 0) {
     const display = ERROR_CODE_DISPLAY[normalizeError(error)];
     return (
-      <View style={[styles.container, styles.centered]}>
-        <View style={styles.errorBox}>
-          <Text style={styles.errorTitle}>履歴の取得に失敗しました</Text>
-          <Text style={styles.errorMessage}>{display.displayMessage}</Text>
-          <Pressable
-            style={styles.retryButton}
-            onPress={() => void refetch()}
-            accessibilityRole="button"
-          >
-            <Text style={styles.retryButtonText}>もう一度試す</Text>
-          </Pressable>
-        </View>
-      </View>
+      <StatusState
+        art={<ArtBusy />}
+        title="うまく読み込めませんでした"
+        body={display.displayMessage}
+        primaryLabel="もう一度試す"
+        onPrimary={() => void refetch()}
+      />
     );
   }
 
@@ -98,7 +88,7 @@ export function LibraryScreen({ navigation }: Props) {
       contentContainerStyle={
         items.length === 0
           ? styles.emptyContent
-          : [styles.listContent, { paddingTop: insets.top + 16 }]
+          : [styles.listContent, { paddingTop: insets.top + 4 }]
       }
       data={items}
       keyExtractor={(item) => item.videoId}
@@ -106,12 +96,19 @@ export function LibraryScreen({ navigation }: Props) {
       ItemSeparatorComponent={Separator}
       onEndReached={handleEndReached}
       onEndReachedThreshold={0.4}
-      refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => void refetch()}
+          tintColor={colors.textTertiary}
+        />
+      }
       ListEmptyComponent={<EmptyState />}
       ListFooterComponent={
         isFetchingNextPage ? (
           <View style={styles.footer}>
-            <ActivityIndicator />
+            <Spinner />
+            <Text style={styles.footerText}>読み込み中</Text>
           </View>
         ) : null
       }
@@ -165,23 +162,24 @@ function Separator() {
 
 function EmptyState() {
   return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyTitle}>まだ要約履歴がありません</Text>
-      <Text style={styles.emptyHint}>要約タブから動画を要約すると、ここに履歴が残ります</Text>
-    </View>
+    <StatusState
+      art={<ArtNoHistory />}
+      title="まだ要約はありません"
+      body="要約タブで動画を要約すると、ここに並んでいきます。"
+    />
   );
 }
 
 function SkeletonList() {
   return (
-    <View style={styles.listContent}>
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <View key={i} style={styles.row}>
-          <Skeleton width={120} height={68} borderRadius={8} />
-          <View style={styles.rowBody}>
-            <Skeleton height={15} />
-            <Skeleton height={15} width="70%" />
-            <Skeleton height={12} width="40%" style={styles.skeletonGap} />
+    <View style={styles.skeletonWrap}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <View key={i} style={[styles.row, i < 4 && styles.rowDivider]}>
+          <Skeleton width={132} height={74} borderRadius={radii.md} />
+          <View style={styles.skeletonBody}>
+            <Skeleton height={13} width="92%" />
+            <Skeleton height={13} width="64%" />
+            <Skeleton height={11} width="34%" style={styles.skeletonGap} />
           </View>
         </View>
       ))}
@@ -192,31 +190,35 @@ function SkeletonList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-  },
-  centered: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+    backgroundColor: colors.bg,
   },
   listContent: {
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: 20,
   },
   emptyContent: {
     flexGrow: 1,
+  },
+  skeletonWrap: {
+    paddingHorizontal: 20,
   },
   row: {
     flexDirection: "row",
     gap: 12,
     alignItems: "flex-start",
+    paddingVertical: 12,
+  },
+  rowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   thumbWrap: {
-    width: 120,
-    height: 68,
-    borderRadius: 8,
+    width: 132,
+    aspectRatio: 16 / 9,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: "hidden",
-    backgroundColor: "#e8e8e8",
+    backgroundColor: colors.surface2,
   },
   thumb: {
     width: "100%",
@@ -225,75 +227,43 @@ const styles = StyleSheet.create({
   rowBody: {
     flex: 1,
     gap: 3,
+    paddingTop: 1,
   },
   rowTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#111",
+    color: colors.textPrimary,
     lineHeight: 20,
   },
   rowChannel: {
-    fontSize: 13,
-    color: "#666",
+    ...type.channel,
+    color: colors.textSecondary,
   },
   rowDate: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 2,
+    ...type.date,
+    color: colors.textTertiary,
   },
   separator: {
     height: 1,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: colors.border,
   },
   footer: {
-    paddingVertical: 16,
-  },
-  empty: {
-    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 32,
     gap: 8,
+    paddingVertical: 18,
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#555",
+  footerText: {
+    ...type.caption,
+    color: colors.textTertiary,
   },
-  emptyHint: {
-    fontSize: 13,
-    color: "#999",
-    textAlign: "center",
+  skeletonBody: {
+    flex: 1,
+    gap: 8,
+    paddingTop: 3,
   },
   skeletonGap: {
     marginTop: 2,
-  },
-  errorBox: {
-    padding: 16,
-    backgroundColor: "#fee",
-    borderRadius: 8,
-    gap: 6,
-    alignItems: "flex-start",
-  },
-  errorTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#c00",
-  },
-  errorMessage: {
-    fontSize: 13,
-    color: "#c00",
-  },
-  retryButton: {
-    marginTop: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: "#c00",
-    borderRadius: 6,
-  },
-  retryButtonText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
   },
 });
