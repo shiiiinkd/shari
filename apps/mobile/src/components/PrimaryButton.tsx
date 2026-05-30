@@ -19,6 +19,7 @@ export function PrimaryButton({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.base,
         { backgroundColor: disabled ? semantic.primaryFillDisabled : semantic.primaryFill },
