@@ -55,6 +55,29 @@ export const summaryCreateOutputSchema = z.object({
 });
 export type SummaryCreateOutput = z.infer<typeof summaryCreateOutputSchema>;
 
+/**
+ * tRPC procedure `summary.get` の入力。保存済み要約の **読み取り専用** 取得。
+ * Library（履歴）からの閲覧で使う。create と異なり字幕取得・Claude 呼び出し・
+ * 利用ログ書き込みを一切行わない（再生成も課金もしない）。
+ */
+export const summaryGetInputSchema = z.object({
+  videoId: z.union([youtubeUrlSchema, videoIdSchema]),
+  language: summaryLanguageSchema.default("ja"),
+});
+export type SummaryGetInput = z.infer<typeof summaryGetInputSchema>;
+
+/**
+ * tRPC procedure `summary.get` の出力。
+ * 常に保存済みキャッシュを返すため cacheHit は持たない（create との非対称は mobile 側で吸収）。
+ * 保存が無い場合は NOT_FOUND（slug: summary_not_cached）を投げる。
+ */
+export const summaryGetOutputSchema = z.object({
+  summaryMd: z.string().min(1),
+  language: summaryLanguageSchema,
+  model: z.string().min(1),
+});
+export type SummaryGetOutput = z.infer<typeof summaryGetOutputSchema>;
+
 /** Claude 要約結果。summaries テーブルの列構造に揃える。 */
 export const summaryResultSchema = z.object({
   /** Markdown 形式の要約本文。 */
