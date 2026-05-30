@@ -15,3 +15,7 @@ apps/backend/.wrangler
 apps/mobile/.expo
 # Expo が expo start 起動時に書き換えるため Prettier の管轄外にする
 apps/mobile/tsconfig.json
+
+# デザイン参照（設計ツール由来のモック JSX / UI Spec HTML）。
+# アプリのビルド・lint 対象外の参照資料で、再生成のたびに整形差分が出るため管轄外にする。
+docs/design

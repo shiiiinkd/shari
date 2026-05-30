@@ -11,7 +11,7 @@
  * （深いリンク URL 化したとき扱いが煩雑になるため）。
  */
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import type { CompositeScreenProps } from "@react-navigation/native";
+import type { CompositeScreenProps, NavigatorScreenParams } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
 /**
@@ -30,7 +30,9 @@ export type TabParamList = {
 
 /** RootStack の route 定義。Tabs 起点、Result を全画面 push。 */
 export type RootStackParamList = {
-  Tabs: undefined;
+  // ネストしたタブへ型安全に遷移できるよう NavigatorScreenParams で持つ
+  // （例: Result から navigation.navigate("Tabs", { screen: "Summarize" })）。
+  Tabs: NavigatorScreenParams<TabParamList>;
   Result: { videoId: string; mode: ResultMode };
 };
 
