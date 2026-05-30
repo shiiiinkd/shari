@@ -1,15 +1,15 @@
 import { useFocusEffect } from "@react-navigation/native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { youtubeUrlSchema } from "@shari/shared";
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import type { RootStackParamList } from "../navigation/types";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { SummarizeScreenProps } from "../navigation/types";
 
-type Props = NativeStackScreenProps<RootStackParamList, "Home">;
+type Props = SummarizeScreenProps;
 
 /**
- * Home: YouTube URL を受け取り videoId 化 → Result へ遷移。
+ * Summarize（要約タブ・初期画面）: YouTube URL を受け取り videoId 化 → Result へ遷移。
  *
  * クリップボード方針 (MVP):
  *   - 起動時 / 画面復帰時に Clipboard.hasUrlAsync() で URL 検出のみ行い、
@@ -18,12 +18,14 @@ type Props = NativeStackScreenProps<RootStackParamList, "Home">;
  *   - 実際の貼り付けはユーザーがボタンを押した時に getStringAsync で行う。
  *   - 自動貼り付け / 設定 ON-OFF は Phase2 で扱う。
  */
-export function HomeScreen({ navigation }: Props) {
+export function SummarizeScreen({ navigation }: Props) {
+  // タブはヘッダ非表示のため、上部 safe-area inset は画面側で確保する。
+  const insets = useSafeAreaInsets();
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [hasClipboardUrl, setHasClipboardUrl] = useState(false);
 
-  // useFocusEffect: Home が再度アクティブになるたび評価し直す。
+  // useFocusEffect: Summarize が再度アクティブになるたび評価し直す。
   // Result から戻ってきた時にもクリップボードに新しい URL が入っていれば反映できる。
   useFocusEffect(
     useCallback(() => {
@@ -60,13 +62,13 @@ export function HomeScreen({ navigation }: Props) {
       setError("正しい YouTube URL を入力してください");
       return;
     }
-    navigation.navigate("Result", { videoId: result.data });
+    navigation.navigate("Result", { videoId: result.data, mode: "new" });
   };
 
   const canSubmit = url.trim().length > 0;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Text style={styles.label}>YouTube URL を入力</Text>
       <TextInput
         style={styles.input}
