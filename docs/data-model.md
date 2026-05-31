@@ -91,7 +91,7 @@ YouTube 動画のメタデータキャッシュ。
 | `video_id`       | text        | FK→`videos.id` ON DELETE CASCADE           |
 | `language`       | text        | NOT NULL default `'ja'`                    |
 | `summary_md`     | text        | NOT NULL（Markdown）                       |
-| `model`          | text        | NOT NULL（例: `'claude-opus-4-7'`）        |
+| `model`          | text        | NOT NULL（例: `'claude-sonnet-4-6'`）      |
 | `prompt_version` | text        | NOT NULL（プロンプト変更時の再生成判定用） |
 | `input_tokens`   | integer     |                                            |
 | `output_tokens`  | integer     |                                            |
