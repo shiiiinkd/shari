@@ -3,13 +3,17 @@
  *
  * 設計メモ:
  * - Anthropic 公式 SDK (`@anthropic-ai/sdk`) を使用。fetch ベースで Workers 互換。
- * - デフォルトモデルは Claude Opus 4.7。コスト調整したい場合のみ呼び出し側で
- *   `claude-sonnet-4-6` / `claude-haiku-4-5` を明示指定する。
+ * - 要約モデルは Claude Sonnet 4.6 に統一（Opus 4.7 から移行・コスト最適）。既定は
+ *   Sonnet 4.6 で運用する。呼び出し側 override は残してあり、高品質が要る場合は
+ *   `claude-opus-4-7` / `claude-opus-4-8`、さらに安くしたい場合は `claude-haiku-4-5`
+ *   を明示指定できる（通常運用では指定しない）。
  * - 長い字幕 + adaptive thinking のため streaming 必須。`.finalMessage()` で待つ。
  * - システムプロンプトに cache_control を付与。同じテンプレートでの 2 回目以降の
  *   呼び出しは入力トークンの大半が cache_read（〜10% コスト）になる。
  * - thinking content は default の "omitted"（UI に出さないため）。
- * - Opus 4.7 では temperature / top_p / top_k / budget_tokens は使用不可（400）。
+ * - Sonnet 4.6: budget_tokens は deprecated。adaptive thinking + effort で制御する。
+ *   effort は low / medium / high を使用（max は Sonnet 非対応）。temperature 等の
+ *   sampling param は本実装では未使用。
  */
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -20,7 +24,7 @@ import {
 } from "@shari/shared";
 import { TRPCError } from "@trpc/server";
 
-export const DEFAULT_MODEL = "claude-opus-4-7";
+export const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 /**
  * システムプロンプト本体のバージョン。
@@ -56,7 +60,7 @@ const SYSTEM_PROMPT = `あなたは日本のソフトウェアエンジニアに
 Markdown のみを出力する。「以下に要約します」のような枕詞は付けない。`;
 
 export interface SummarizeOptions {
-  /** 使用する Claude モデル。デフォルト: claude-opus-4-7 */
+  /** 使用する Claude モデル。デフォルト: claude-sonnet-4-6 */
   model?: string;
 }
 

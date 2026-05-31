@@ -71,7 +71,7 @@ export const summaryRouter = router({
       // 3. summaries キャッシュ確認
       // 4. miss なら Claude API 呼ぶ
       // 5. requests に記録
-      return { summaryMd: "...", model: "claude-opus-4-7", cacheHit: false };
+      return { summaryMd: "...", model: "claude-sonnet-4-6", cacheHit: false };
     }),
 });
 ```
